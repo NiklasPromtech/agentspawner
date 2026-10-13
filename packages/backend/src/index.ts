@@ -128,7 +128,9 @@ await reloadSchedules();
 await reloadTelegramPollers();
 
 const { port } = getConfig();
-await fastify.listen({ port, host: '0.0.0.0' });
+// Loopback only: the API has no auth and can drive the user's logged-in browser,
+// so it must not be reachable from the LAN. 'localhost' binds both 127.0.0.1 and ::1.
+await fastify.listen({ port, host: 'localhost' });
 logger.info({ port }, `AgentSpawner backend running on http://localhost:${port}`);
 
 // Graceful shutdown on SIGTERM — mark all in-flight runs as stopped, then close
