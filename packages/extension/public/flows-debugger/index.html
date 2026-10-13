@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flows Debugger</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 16px;
+      min-width: 420px;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      margin-bottom: 14px;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #58a6ff;
+      letter-spacing: 0.3px;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: #6e7681;
+      margin-top: 2px;
+    }
+
+    /* ── Shared ──────────────────────────────────────── */
+    .hidden { display: none; }
+
+    .section-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+
+    .field-group {
+      margin-bottom: 8px;
+    }
+    .field-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .field-label .opt-badge {
+      font-size: 8px;
+      color: #6e7681;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+    .field-input {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      transition: border-color 0.12s;
+      box-sizing: border-box;
+    }
+    .field-input:focus {
+      outline: none;
+      border-color: #1f6feb;
+    }
+    .field-input::placeholder { color: #484f58; }
+
+    .run-btn {
+      width: 100%;
+      padding: 8px;
+      background: #1f6feb;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .run-btn:hover { background: #388bfd; }
+    .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .run-btn.running { opacity: 0.7; cursor: not-allowed; }
+
+    /* ── Flows panel ─────────────────────────────────── */
+    .flow-error {
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: #3d1a1a;
+      border: 1px solid #f85149;
+      border-radius: 6px;
+      color: #f85149;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .flow-name-heading {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #21262d;
+      font-size: 13px;
+      font-weight: 700;
+      color: #3fb950;
+    }
+
+    /* ── Flow step results ───────────────────────────── */
+    #flow-results {
+      margin-top: 10px;
+    }
+    .flow-step-result {
+      margin-bottom: 8px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+    }
+    .flow-step-result.fsr-ok  { border-color: #2ea043; }
+    .flow-step-result.fsr-fail { border-color: #f85149; }
+    .fsr-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .fsr-ok   .fsr-header { background: #1a4731; }
+    .fsr-fail .fsr-header { background: #3d1a1a; }
+    .fsr-num  { color: #8b949e; flex-shrink: 0; }
+    .fsr-label {
+      color: #e6edf3;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fsr-badge {
+      flex-shrink: 0;
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+    .fsr-pass      { background: rgba(46,160,67,0.25); color: #3fb950; }
+    .fsr-fail-badge { background: rgba(248,81,73,0.25); color: #f85149; }
+    .fsr-pre {
+      background: #0d1117;
+      padding: 8px 10px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 10px;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.5;
+      margin: 0;
+    }
+    /* Collapse / expand */
+    .fsr-collapsed .fsr-pre { display: none; }
+    .fsr-toggle {
+      flex-shrink: 0;
+      font-size: 8px;
+      color: #8b949e;
+      width: 10px;
+      text-align: center;
+    }
+    /* Tool name chip */
+    .fsr-tool {
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 9px;
+      color: #79c0ff;
+      background: rgba(121,192,255,0.12);
+      border: 1px solid rgba(121,192,255,0.2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      flex-shrink: 0;
+      max-width: 90px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .flow-complete-msg {
+      margin-top: 10px;
+      padding: 10px;
+      background: #1a4731;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #3fb950;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* ── Inline step editor ───────────────────────────── */
+    .fsr-edit-btn {
+      margin-left: auto;
+      flex-shrink: 0;
+      font-size: 9px;
+      padding: 2px 7px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 4px;
+      cursor: pointer;
+      color: inherit;
+      font-weight: 600;
+      transition: background 0.1s;
+    }
+    .fsr-edit-btn:hover { background: rgba(0,0,0,0.4); }
+
+    .fsr-editor {
+      background: #0d1117;
+      border-top: 1px solid #21262d;
+      padding: 8px 10px;
+    }
+    /* Hide editor when block is collapsed */
+    .fsr-collapsed .fsr-editor { display: none; }
+
+    .fsr-editor-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+    .fsr-editor-key {
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 9px;
+      color: #8b949e;
+      min-width: 55px;
+      max-width: 80px;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fsr-editor-type {
+      font-size: 8px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .fsr-type-literal    { background: rgba(121,192,255,0.12); color: #79c0ff; border: 1px solid rgba(121,192,255,0.2); }
+    .fsr-type-flow_input { background: rgba(63,185,80,0.12);  color: #3fb950; border: 1px solid rgba(63,185,80,0.2);  }
+    .fsr-type-step_ref   { background: rgba(210,153,34,0.12); color: #d2992a; border: 1px solid rgba(210,153,34,0.2); }
+
+    .fsr-editor-val {
+      flex: 1;
+      min-width: 0;
+      font-size: 10px;
+      padding: 3px 6px;
+    }
+    .fsr-editor-empty {
+      font-size: 10px;
+      color: #6e7681;
+      font-style: italic;
+      padding: 2px 0 6px;
+    }
+    .fsr-rerun-btn {
+      width: 100%;
+      margin-top: 6px;
+      padding: 5px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      color: #e6edf3;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .fsr-rerun-btn:hover { background: #30363d; }
+    .fsr-rerun-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Add step divider ────────────────────────────── */
+    .fsr-insert-divider {
+      margin: 2px 0 6px;
+    }
+    .fsr-insert-btn {
+      width: 100%;
+      padding: 4px 8px;
+      background: transparent;
+      border: 1px dashed #30363d;
+      border-radius: 5px;
+      color: #6e7681;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: border-color 0.12s, color 0.12s;
+      text-align: center;
+    }
+    .fsr-insert-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+
+    .fsr-insert-form {
+      margin-top: 6px;
+      padding: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+    }
+    .fsr-insert-row {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 5px;
+      align-items: center;
+    }
+    .fsr-insert-row .fsr-insert-key {
+      flex: 0 0 90px;
+      font-size: 10px;
+      padding: 4px 6px;
+    }
+    .fsr-insert-row .fsr-insert-val {
+      flex: 1;
+      font-size: 10px;
+      padding: 4px 6px;
+    }
+    .fsr-remove-row-btn {
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: #6e7681;
+      cursor: pointer;
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      transition: color 0.1s;
+    }
+    .fsr-remove-row-btn:hover { color: #f85149; }
+    .fsr-add-row-btn {
+      margin-top: 2px;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      background: transparent;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #8b949e;
+      font-size: 10px;
+      cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .fsr-add-row-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .fsr-insert-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .fsr-confirm-btn {
+      flex: 1;
+      padding: 5px;
+      background: #1f6feb;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .fsr-confirm-btn:hover { background: #388bfd; }
+    .fsr-cancel-btn {
+      padding: 5px 10px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      color: #8b949e;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .fsr-cancel-btn:hover { background: #30363d; }
+    select.field-input { cursor: pointer; }
+
+    /* ── Lock In button ───────────────────────────────── */
+    .flow-lock-in-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 9px;
+      background: #1a4731;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #3fb950;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .flow-lock-in-btn:hover:not(:disabled) { background: #2ea043; color: #fff; }
+    .flow-lock-in-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .flow-save-success {
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: #1a4731;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #3fb950;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .flow-save-error {
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: #3d1a1a;
+      border: 1px solid #f85149;
+      border-radius: 6px;
+      color: #f85149;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">⚡ Flows Debugger</div>
+    <div class="subtitle">AgentSpawner</div>
+  </div>
+
+  <div class="section-label">Flow Debugger</div>
+
+  <div class="field-group">
+    <div class="field-label">Flow ID</div>
+    <input
+      type="text"
+      id="flow-id-input"
+      class="field-input"
+      placeholder="Paste flow UUID…"
+      autocomplete="off"
+      spellcheck="false"
+    >
+  </div>
+
+  <button class="run-btn" id="flow-load-btn">Load Flow</button>
+
+  <div id="flow-error" class="flow-error hidden"></div>
+
+  <div id="flow-name-heading" class="flow-name-heading hidden"></div>
+
+  <div id="flow-inputs"></div>
+
+  <button class="run-btn hidden" id="flow-run-step-btn"></button>
+
+  <div id="flow-results"></div>
+
+  <button class="flow-lock-in-btn hidden" id="flow-lock-in-btn">🔒 Lock In</button>
+  <div id="flow-save-status" class="hidden"></div>
+
+  <script src="../flows_debugger/index.js" type="module"></script>
+</body>
+</html>

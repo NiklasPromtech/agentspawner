@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<!-- Sandboxed page: allowed unsafe-eval, no Chrome APIs. Communicates via postMessage. -->
+<script>
+'use strict';
+
+// Pending tab operation requests (id → {resolve, reject})
+let nextId = 0;
+const pending = new Map();
+
+// Tab helper: proxies all operations to parent (offscreen) via postMessage
+function makeTabHelper() {
+  function send(method, payload) {
+    return new Promise((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve, reject });
+      parent.postMessage({ type: 'TAB_REQUEST', id, method, payload }, '*');
+    });
+  }
+  return {
+    open:        (url, active = true) => send('open', { url, active }),
+    close:       (tabId)              => send('close', { tabId }),
+    navigate:    (tabId, url)         => send('navigate', { tabId, url }),
+    waitForLoad: (tabId)              => send('waitForLoad', { tabId }),
+    exec:        (tabId, code)             => send('exec',        { tabId, code }),
+    sleep:       (ms)                      => send('sleep',       { ms }),
+    screenshot:  (tabId)                   => send('screenshot',  { tabId }),
+    // Pre-compiled DOM ops — no eval, work on strict-CSP pages (X.com, etc.)
+    domGet:      (tabId, selector)         => send('domGet',      { tabId, selector: selector || null }),
+    domQueryAll: (tabId, selector, limit)  => send('domQueryAll', { tabId, selector, limit: limit || 100 }),
+    domClick:    (tabId, selector)         => send('domClick',    { tabId, selector }),
+    domType:     (tabId, selector, text)   => send('domType',     { tabId, selector, text }),
+    domCheck:    (tabId, selector)         => send('domCheck',    { tabId, selector }),
+    domScroll:   (tabId, selector, x, y)   => send('domScroll',   { tabId, selector: selector || null, x, y }),
+    domGetAll:   (tabId, selector, limit)  => send('domGetAll',   { tabId, selector, limit: limit || 50 }),
+    waitForAny:  (tabId, selectors, timeoutMs) => send('domWaitForAny', { tabId, selectors, timeoutMs: timeoutMs || 15000 }),
+  };
+}
+
+window.addEventListener('message', async (event) => {
+  const msg = event.data;
+  if (!msg || !msg.type) return;
+
+  // Execute tool code
+  if (msg.type === 'EXECUTE') {
+    const { correlationId, code, input } = msg;
+    const tab = makeTabHelper();
+    try {
+      // new Function is allowed here because this is a sandboxed page
+      const fn = new Function('input', 'tab', '"use strict"; return (async () => { ' + code + ' })()');
+      const result = await fn(input, tab);
+      parent.postMessage({ type: 'RESULT', correlationId, result }, '*');
+    } catch (err) {
+      parent.postMessage({ type: 'RESULT', correlationId, error: err.message }, '*');
+    }
+    return;
+  }
+
+  // Tab operation response from parent
+  if (msg.type === 'TAB_RESPONSE') {
+    const cb = pending.get(msg.id);
+    if (!cb) return;
+    pending.delete(msg.id);
+    if (msg.error) cb.reject(new Error(msg.error));
+    else cb.resolve(msg.result);
+    return;
+  }
+});
+
+// Signal ready
+parent.postMessage({ type: 'SANDBOX_READY' }, '*');
+</script>
+</body>
+</html>

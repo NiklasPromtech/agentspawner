@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentSpawner — Complete Technical Documentation</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #161b22; --border: #30363d;
+    --text: #e1e4e8; --muted: #8b949e; --accent: #58a6ff;
+    --success: #3fb950; --error: #f85149; --warning: #d29922;
+    --purple: #d2a8ff; --orange: #ffa657;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; }
+  h1 { font-size: 2rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin: 2.5rem 0 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.6rem; }
+  h4 { font-size: 0.95rem; font-weight: 600; color: var(--muted); margin: 1rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  p { margin-bottom: 0.85rem; color: var(--text); font-size: 0.95rem; }
+  code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; background: rgba(110,118,129,0.15); padding: 0.15em 0.4em; border-radius: 4px; color: var(--orange); }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; overflow-x: auto; margin: 1rem 0; }
+  pre code { background: none; padding: 0; color: var(--text); font-size: 0.85rem; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2.5rem; }
+  .toc h3 { margin-top: 0; color: var(--accent); }
+  .toc ol { padding-left: 1.4rem; }
+  .toc li { margin: 0.3rem 0; font-size: 0.9rem; }
+  .toc a { color: var(--muted); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .note { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.25); border-left: 3px solid var(--accent); border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.9rem; }
+  .warn { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.25); border-left: 3px solid var(--warning); border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.9rem; }
+  .success-box { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25); border-left: 3px solid var(--success); border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.9rem; }
+
+  /* ── Screen mockup ── */
+  .screen { background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; margin: 1.25rem 0; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+  .screen-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c840; }
+  .screen-url { background: rgba(255,255,255,0.06); border-radius: 4px; padding: 0.15rem 0.6rem; font-size: 0.75rem; color: var(--muted); font-family: monospace; flex: 1; max-width: 400px; }
+  .screen-body { padding: 1.25rem; }
+
+  /* ── UI element replicas ── */
+  .ui-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0; }
+  .ui-tabs { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; gap: 0; overflow-x: auto; }
+  .ui-tab { padding: 0.6rem 1rem; font-size: 0.82rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; }
+  .ui-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+  .ui-content { padding: 1.25rem; }
+  .ui-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+  .badge-red { background: rgba(218,54,51,0.15); color: var(--error); border: 1px solid rgba(218,54,51,0.3); }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--success); border: 1px solid rgba(63,185,80,0.3); }
+  .badge-yellow { background: rgba(210,153,34,0.15); color: var(--warning); border: 1px solid rgba(210,153,34,0.3); }
+  .badge-purple { background: rgba(210,168,255,0.15); color: var(--purple); border: 1px solid rgba(210,168,255,0.3); }
+  .stat-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.75rem 0; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 1rem; min-width: 110px; }
+  .stat-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.2rem; }
+  .stat-value { font-size: 1.3rem; font-weight: 700; }
+  .btn { display: inline-block; padding: 0.35rem 0.8rem; border-radius: 6px; font-size: 0.82rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
+  .btn-green { background: #238636; color: #fff; }
+  .btn-blue { background: #1f6feb; color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-red { background: transparent; border: 1px solid rgba(218,54,51,0.4); color: var(--error); }
+
+  /* ── Diagrams ── */
+  .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 1.25rem 0; font-family: 'SF Mono', monospace; font-size: 0.8rem; color: var(--muted); line-height: 1.8; overflow-x: auto; }
+  .diagram .box { display: inline-block; border: 1px solid var(--accent); border-radius: 4px; padding: 0.15rem 0.5rem; color: var(--accent); background: rgba(88,166,255,0.06); }
+  .diagram .box-green { display: inline-block; border: 1px solid var(--success); border-radius: 4px; padding: 0.15rem 0.5rem; color: var(--success); background: rgba(63,185,80,0.06); }
+  .diagram .box-red { display: inline-block; border: 1px solid var(--error); border-radius: 4px; padding: 0.15rem 0.5rem; color: var(--error); background: rgba(218,54,51,0.06); }
+  .diagram .box-yellow { display: inline-block; border: 1px solid var(--warning); border-radius: 4px; padding: 0.15rem 0.5rem; color: var(--warning); background: rgba(210,153,34,0.06); }
+  .diagram .box-purple { display: inline-block; border: 1px solid var(--purple); border-radius: 4px; padding: 0.15rem 0.5rem; color: var(--purple); background: rgba(210,168,255,0.06); }
+  .arrow { color: var(--muted); }
+
+  /* ── Flow step visualization ── */
+  .flow-steps { display: flex; flex-direction: column; gap: 0; margin: 1rem 0; }
+  .flow-step { display: flex; align-items: flex-start; gap: 0.75rem; }
+  .flow-step-line { display: flex; flex-direction: column; align-items: center; }
+  .flow-step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
+  .flow-step-connector { width: 2px; height: 20px; background: var(--border); }
+  .flow-step-body { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; flex: 1; margin-bottom: 8px; }
+  .flow-step-label { font-size: 0.82rem; font-weight: 600; }
+  .flow-step-tool { font-size: 0.75rem; color: var(--muted); font-family: monospace; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+  th { background: var(--surface); border: 1px solid var(--border); padding: 0.6rem 0.75rem; text-align: left; color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { border: 1px solid var(--border); padding: 0.55rem 0.75rem; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .running-bar { background: linear-gradient(90deg, rgba(35,134,54,0.18) 0%, rgba(35,134,54,0.07) 100%); border-bottom: 1px solid #238636; border-left: 3px solid #3fb950; padding: 0.45rem 1rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div style="margin-bottom:2rem; padding-bottom:1.5rem; border-bottom:1px solid var(--border);">
+  <h1>AgentSpawner</h1>
+  <p style="font-size:1.05rem; color:var(--muted); margin:0;">Complete Technical Documentation — Architecture, UI, Agents, Flows, Memory & More</p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h3>📋 Table of Contents</h3>
+  <ol>
+    <li><a href="#architecture">System Architecture</a></li>
+    <li><a href="#tech-stack">Tech Stack & Project Structure</a></li>
+    <li><a href="#database">Database Schema</a></li>
+    <li><a href="#home-page">Home Page (Agent Grid)</a></li>
+    <li><a href="#onboarding">Agent Onboarding Flow</a></li>
+    <li><a href="#agent-layout">Agent Layout — Header, Tabs & Status Bar</a></li>
+    <li><a href="#dashboard-tab">Dashboard Tab</a></li>
+    <li><a href="#chat-tab">Chat Tab</a></li>
+    <li><a href="#setup-tab">Setup Tab</a></li>
+    <li><a href="#flows-tab">Flows Tab</a></li>
+    <li><a href="#flow-editor">Flow Editor</a></li>
+    <li><a href="#flow-generator">Flow Generator (AI)</a></li>
+    <li><a href="#scrape-flows">Scrape Flows — How They Work</a></li>
+    <li><a href="#action-flows">Action Flows — How They Work</a></li>
+    <li><a href="#vantage">OPERATION VANTAGE: Hydration + Generation Pipeline</a></li>
+    <li><a href="#context-structure">Context Structure for Smart Agents (ActionBrief)</a></li>
+    <li><a href="#dedup">Deduplication & Guard System</a></li>
+    <li><a href="#review-actions">Review Actions Tab</a></li>
+    <li><a href="#review-scrapes">Review Scrapes Tab</a></li>
+    <li><a href="#memory">Memory System (Librarian)</a></li>
+    <li><a href="#memory-tab">Memory Tab</a></li>
+    <li><a href="#goals-tab">Goals Tab</a></li>
+    <li><a href="#schedule-tab">Schedule Tab & Wake-Up System</a></li>
+    <li><a href="#manager-agent">Manager Agent (Autonomous Mode)</a></li>
+    <li><a href="#chat-agent">Chat Agent</a></li>
+    <li><a href="#extension">Chrome Extension & WebSocket Protocol</a></li>
+    <li><a href="#extension-tab">Extension Tab</a></li>
+    <li><a href="#database-tab">Database Tab</a></li>
+    <li><a href="#analytics-tab">Analytics Tab</a></li>
+    <li><a href="#trace-tab">Trace Tab</a></li>
+    <li><a href="#brain-map">Brain Map Tab</a></li>
+    <li><a href="#api-tools">API Tools Tab</a></li>
+    <li><a href="#logs-tab">Logs Tab</a></li>
+    <li><a href="#startup">Server Startup Sequence</a></li>
+    <li><a href="#encryption">Encryption & Security</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="architecture">1. System Architecture</h2>
+
+<p>AgentSpawner is a browser-automation platform where AI agents independently operate on websites. The architecture has four distinct layers that work together:</p>
+
+<div class="diagram">
+<pre>
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         USER'S BROWSER (React UI)                        │
+│  Home ─── Agent Dashboard ─── Flow Editor ─── Review Actions ─── etc.   │
+│                    ↕  REST + SSE (port 5173 → 3001)                       │
+└──────────────────────────────────────────────────────────────────────────┘
+                              ↕
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    BACKEND SERVER (Fastify · Node.js · port 3001)         │
+│                                                                          │
+│   Chat Agent ────────────────────────────────── Anthropic API            │
+│   Manager Agent  ←─ Haiku loop (cheap) ───────→ (claude-haiku / sonnet) │
+│   Action Flow Agent  ←─ builds flows                                     │
+│   Scrape Flow Agent  ←─ builds flows                                     │
+│   Setup Agent        ←─ onboarding                                       │
+│                                                                          │
+│   Flow Runner ────── tool execution ────────────────────┐               │
+│   Memory Librarian ← auto-enriches every tool result    │               │
+│   Scheduler ──────── node-cron ── wake-up trigger        │               │
+│   SQLite DB ──────── drizzle ORM                        │               │
+└────────────────────────────────────────────────────────────┼────────────┘
+                              ↕ WebSocket                    │
+┌──────────────────────────────────────────────────────────── ▼ ──────────┐
+│                   CHROME EXTENSION (Manifest V3)                         │
+│   offscreen.html ── executes tab commands (navigate, click, type, etc.) │
+│   content script ── records interactions for flow capture               │
+└──────────────────────────────────────────────────────────────────────────┘
+                              ↕
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         LIVE WEBSITES                                    │
+│   Twitter/X · Reddit · LinkedIn · Any site the flows target              │
+└──────────────────────────────────────────────────────────────────────────┘
+</pre>
+</div>
+
+<h3>Two-Tier AI Model Strategy</h3>
+<p>Every agent uses two different Claude models for different jobs:</p>
+<table>
+  <tr><th>Model</th><th>Role</th><th>Cost</th><th>Used For</th></tr>
+  <tr><td><code>claude-haiku-4-5</code></td><td>Reasoning Loop</td><td>$0.80/M in · $4/M out</td><td>Autonomous orchestration, memory enrichment, conversation compaction, all continuous iteration</td></tr>
+  <tr><td><code>claude-sonnet-4-6</code> (default)</td><td>Generation</td><td>Higher</td><td><code>__generate__</code> step in flows — writing final posts, DMs, comments in the agent's voice</td></tr>
+  <tr><td><code>claude-opus-4-6</code></td><td>Optional override</td><td>Highest</td><td>High-stakes content generation</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="tech-stack">2. Tech Stack & Project Structure</h2>
+
+<pre><code>agentspawner/                    ← PNPM monorepo root
+├── packages/
+│   ├── backend/                 ← Fastify API server (Node.js · TypeScript)
+│   │   └── src/
+│   │       ├── agents/          ← chat-agent, manager-agent, setup-agent, flow agents
+│   │       ├── db/              ← Drizzle schema + migrations (13+ migrations)
+│   │       ├── features/flows/  ← flow-runner, hydration, flow-validator
+│   │       ├── memory/          ← librarian.ts (auto-enrichment)
+│   │       ├── orchestrator/    ← tool-runner, abort/nudge registries, tool handlers
+│   │       ├── routes/          ← all REST endpoints
+│   │       ├── scheduler/       ← node-cron wake-up system
+│   │       ├── websocket/       ← extension WebSocket protocol
+│   │       ├── crypto/          ← AES-256-GCM encryption for API keys
+│   │       └── index.ts         ← server entry + startup sequence
+│   ├── frontend/                ← React + Vite SPA (TypeScript)
+│   │   └── src/
+│   │       ├── pages/           ← Home.tsx, AgentOnboarding.tsx
+│   │       │   └── agent/       ← 20+ tab components
+│   │       ├── components/      ← FlowEditor, FlowGenerator, AgentCard, etc.
+│   │       ├── api/             ← REST client
+│   │       └── hooks/           ← React Query hooks
+│   ├── extension/               ← Chrome extension (Manifest V3)
+│   └── shared/                  ← Zod schemas shared between front + back
+│       └── src/schemas/
+│           └── flow.schema.ts   ← ActionBrief, HydratedContext, etc.
+├── data/agentspawner.db         ← SQLite database (auto-created)
+└── .env                         ← ENCRYPTION_SECRET, PORT, DB_PATH</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="database">3. Database Schema</h2>
+<p>All state lives in a single SQLite file at <code>./data/agentspawner.db</code>. Drizzle ORM manages schema migrations.</p>
+
+<table>
+  <tr><th>Table</th><th>Purpose</th><th>Key Columns</th></tr>
+  <tr><td><code>agents</code></td><td>Agent definitions</td><td>id, name, model, systemPrompt, profileBlob (JSON), toneGuide, apiKeyEncrypted, telegramBotToken, status, currentTask</td></tr>
+  <tr><td><code>tools</code></td><td>Browser/web tools per agent</td><td>id, agentId, name, type (extension|web_search|web_fetch|local), inputSchema, description</td></tr>
+  <tr><td><code>flows</code></td><td>Automation pipelines</td><td>id, agentId, name, steps (JSON), flowType (scrape|action), dedupKeyField, dedupBreakType, dedupIntervalHours, requiresApproval, infeasible</td></tr>
+  <tr><td><code>runs</code></td><td>Chat + autonomous sessions</td><td>id, agentId, status (pending|running|completed|failed|stopped), trigger, inputTokens, outputTokens, costUsd</td></tr>
+  <tr><td><code>messages</code></td><td>Conversation history</td><td>id, runId, role (user|assistant|tool_result), content</td></tr>
+  <tr><td><code>flowRuns</code></td><td>Flow execution audit log</td><td>id, agentId, flowId, flowName, input, output, success, durationMs, evaluationPassed, evaluationReason, error</td></tr>
+  <tr><td><code>actionLog</code></td><td>Dedup + approval queue</td><td>id, agentId, flowId, flowName, keyField, keyValue, status (pending_review|executing|approved|rejected|executed|failed|blocked), content, amendedContent</td></tr>
+  <tr><td><code>memory</code></td><td>Persistent agent learning</td><td>id, agentId, entities (JSON array), category, content, metadata (JSON), rawHash (SHA-256 dedup), sourceToolName</td></tr>
+  <tr><td><code>tables</code></td><td>Agent-created data stores</td><td>id, agentId, name, schema (JSON)</td></tr>
+  <tr><td><code>rows</code></td><td>Rows in agent tables</td><td>id, tableId, data (JSON), runId, flowRunId</td></tr>
+  <tr><td><code>goals</code></td><td>Hierarchical mission/tasks</td><td>id, agentId, type (mission|objective|task), title, status, priority (1-4), dueDate, notes, completedAt</td></tr>
+  <tr><td><code>schedules</code></td><td>Cron triggers</td><td>id, agentId, cron, input (__wake_up__ or message), flowId, enabled, timezone, lastRunAt</td></tr>
+  <tr><td><code>apiTools</code></td><td>Custom HTTP/script tools</td><td>id, agentId, name, type (http|script), config (JSON)</td></tr>
+  <tr><td><code>agentSecrets</code></td><td>Per-agent encrypted secrets</td><td>id, agentId, key, valueEncrypted</td></tr>
+  <tr><td><code>toneEdits</code></td><td>Human correction pairs</td><td>id, agentId, original, amended, context — used to regenerate toneGuide</td></tr>
+  <tr><td><code>contacts</code></td><td>Outreach contact records</td><td>id, agentId, handle, platform, status, notes</td></tr>
+  <tr><td><code>performanceLog</code></td><td>Action outcome tracking</td><td>id, agentId, category, outcome (success|failure), details</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="home-page">4. Home Page — Agent Grid</h2>
+<p>Route: <code>/</code> — The landing page lists all agents as cards in a responsive grid.</p>
+
+<div class="screen">
+  <div class="screen-bar">
+    <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+    <span class="screen-url">localhost:5173</span>
+  </div>
+  <div class="screen-body" style="padding:0;">
+    <div style="max-width:860px;margin:0 auto;padding:2rem 1.25rem;">
+
+      <!-- Resume draft banner -->
+      <div style="background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.3);border-left:3px solid #58a6ff;border-radius:8px;padding:0.7rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.85rem;"><span style="color:#58a6ff;font-weight:600;">↩ Unfinished setup — </span><span>GrowthBot (building flow 2 of 4)</span></span>
+        <div style="display:flex;gap:0.5rem;">
+          <span class="btn btn-blue" style="font-size:0.78rem;">Continue building →</span>
+          <span class="btn btn-outline" style="font-size:0.75rem;">Discard</span>
+        </div>
+      </div>
+
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span style="font-size:1.4rem;font-weight:700;">AgentSpawner</span>
+          <span style="background:#238636;color:#fff;border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:0.3rem;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#7ee787;display:inline-block;"></span>
+            2 running
+          </span>
+        </div>
+        <span class="btn btn-green">+ New Agent</span>
+      </div>
+
+      <!-- Agent card grid -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+
+        <!-- Card 1: running -->
+        <div class="ui-card" style="border-left:3px solid #3fb950;position:relative;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
+            <span style="font-weight:700;font-size:0.95rem;">GrowthBot</span>
+            <span class="badge badge-green" style="display:flex;align-items:center;gap:0.3rem;"><span style="width:5px;height:5px;border-radius:50%;background:#3fb950;display:inline-block;animation:pulse 1.5s infinite;"></span>Running</span>
+          </div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">Reddit growth agent — posts comments on relevant threads</p>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem;">claude-sonnet-4-6 · 4 flows · $0.23 today</div>
+          <div style="font-size:0.75rem;color:#3fb950;background:rgba(63,185,80,0.08);border-radius:4px;padding:0.3rem 0.5rem;margin-bottom:0.6rem;">
+            → Posting comment on r/startups
+          </div>
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+            <span class="btn btn-outline" style="font-size:0.75rem;">Chat</span>
+            <span class="btn btn-red" style="font-size:0.75rem;">■ Stop</span>
+          </div>
+        </div>
+
+        <!-- Card 2: idle -->
+        <div class="ui-card">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
+            <span style="font-weight:700;font-size:0.95rem;">SalesBot</span>
+            <span class="badge" style="background:rgba(139,148,158,0.1);color:#8b949e;font-size:0.7rem;">Idle</span>
+          </div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">LinkedIn outreach — connects with SaaS founders</p>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">claude-haiku-4-5 · 6 flows · $0.04 today</div>
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+            <span class="btn btn-outline" style="font-size:0.75rem;">Chat</span>
+            <span class="btn btn-green" style="font-size:0.75rem;">▶ Start</span>
+          </div>
+        </div>
+
+        <!-- Card 3: empty state prompt -->
+        <div class="ui-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:1.5rem;border-style:dashed;opacity:0.5;">
+          <div style="font-size:1.5rem;opacity:0.4;margin-bottom:0.5rem;">✦</div>
+          <p style="font-size:0.82rem;color:var(--muted);">+ New Agent</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>What's on this page</h3>
+<p>The home page does several things automatically:</p>
+<ul style="padding-left:1.5rem;font-size:0.92rem;line-height:2;">
+  <li><strong>Resume banners</strong> — if you were mid-onboarding or mid-flow-generation when you navigated away, a blue or green banner appears offering to resume. This is stored in <code>localStorage</code> via the <code>drafts</code> utility.</li>
+  <li><strong>Running agent badge</strong> — polls <code>GET /agents/:id/status</code> every 8 seconds. Shows a pulsing green "N running" badge in the header.</li>
+  <li><strong>Stop button</strong> — calls <code>POST /runs/:runId/stop</code> with optimistic UI (hides the badge immediately, restores if the call fails).</li>
+  <li><strong>Agent cards</strong> — each shows: name, status badge, description, model, flow count, today's spend, current task (if running), and action buttons.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="onboarding">5. Agent Onboarding Flow</h2>
+<p>Route: <code>/agents/new</code> — A guided multi-phase wizard that sets up an agent from scratch using AI.</p>
+
+<div class="screen">
+  <div class="screen-bar">
+    <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+    <span class="screen-url">localhost:5173/agents/new</span>
+  </div>
+  <div class="screen-body" style="padding:0;">
+    <div style="display:flex;height:520px;">
+
+      <!-- Chat panel (left) -->
+      <div style="flex:1;padding:1.5rem;border-right:1px solid var(--border);display:flex;flex-direction:column;">
+        <div style="font-weight:700;font-size:1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.6rem;">
+          ✦ Setup Chat
+          <span class="badge badge-blue">Phase: Chat</span>
+        </div>
+
+        <!-- Messages -->
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0.75rem;">
+          <div style="background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;max-width:85%;">
+            Hey! Let's set up your agent. Tell me what job you want it to do — in plain English. What should it actually be doing every day?
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;max-width:85%;align-self:flex-end;">
+            I want it to find relevant Reddit discussions about SaaS growth and post thoughtful comments that subtly promote our product.
+          </div>
+          <div style="background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;max-width:85%;">
+            Got it — a Reddit growth agent. A few questions: What's your product URL? Which subreddits are most relevant? Should it reply to existing threads or create new posts?
+          </div>
+        </div>
+
+        <!-- Input -->
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+          <input style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:0.5rem 0.75rem;font-size:0.875rem;" placeholder="Type your answer…" />
+          <span class="btn btn-blue">Send →</span>
+        </div>
+      </div>
+
+      <!-- Right panel: phase tracker -->
+      <div style="width:280px;padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <div style="font-size:0.8rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.25rem;">Setup Phases</div>
+
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:6px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);">
+          <span style="color:#3fb950;font-size:0.85rem;">✓</span>
+          <span style="font-size:0.82rem;color:#3fb950;font-weight:600;">1. Chat & Research</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:6px;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);">
+          <span style="color:#58a6ff;font-size:0.85rem;">◉</span>
+          <span style="font-size:0.82rem;color:#58a6ff;font-weight:600;">2. Brief Review</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:6px;background:transparent;border:1px solid var(--border);">
+          <span style="color:var(--muted);font-size:0.85rem;">○</span>
+          <span style="font-size:0.82rem;color:var(--muted);">3. Flow Planning</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:6px;background:transparent;border:1px solid var(--border);">
+          <span style="color:var(--muted);font-size:0.85rem;">○</span>
+          <span style="font-size:0.82rem;color:var(--muted);">4. Flow Building</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:6px;background:transparent;border:1px solid var(--border);">
+          <span style="color:var(--muted);font-size:0.85rem;">○</span>
+          <span style="font-size:0.82rem;color:var(--muted);">5. Complete</span>
+        </div>
+
+        <div style="margin-top:0.75rem;padding:0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem;font-weight:600;">AGENT NAME</div>
+          <div style="font-size:0.9rem;font-weight:600;">GrowthBot</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<h3>The 5 Onboarding Phases</h3>
+<div class="flow-steps">
+  <div class="flow-step">
+    <div class="flow-step-line"><div class="flow-step-dot" style="background:rgba(63,185,80,0.2);color:#3fb950;border:1px solid #3fb950;">1</div><div class="flow-step-connector"></div></div>
+    <div class="flow-step-body"><div class="flow-step-label">Chat & Research</div><div class="flow-step-tool" style="color:var(--muted);font-family:sans-serif;">Multi-turn conversation with the Setup Agent. It asks about the platform, goals, company context. Internally it calls <code>web_search</code> to research the company URL provided. Saves progress to <code>localStorage</code> so you can leave and resume.</div></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-line"><div class="flow-step-dot" style="background:rgba(88,166,255,0.2);color:#58a6ff;border:1px solid #58a6ff;">2</div><div class="flow-step-connector"></div></div>
+    <div class="flow-step-body"><div class="flow-step-label">Brief Review</div><div class="flow-step-tool" style="color:var(--muted);font-family:sans-serif;">Calls <code>POST /agents/:id/setup/generate</code> which runs the Setup Agent to produce: system prompt, profileBlob (JSON with job description, tone, competitors, allowed/restricted actions), and a list of recommended flows.</div></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-line"><div class="flow-step-dot" style="background:rgba(210,153,34,0.2);color:#d29922;border:1px solid #d29922;">3</div><div class="flow-step-connector"></div></div>
+    <div class="flow-step-body"><div class="flow-step-label">Flow Planning</div><div class="flow-step-tool" style="color:var(--muted);font-family:sans-serif;">Shows the AI-proposed list of flows (scrape + action). User can review names, types, and descriptions. Can add/remove planned flows.</div></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-line"><div class="flow-step-dot" style="background:rgba(210,168,255,0.2);color:#d2a8ff;border:1px solid #d2a8ff;">4</div><div class="flow-step-connector"></div></div>
+    <div class="flow-step-body"><div class="flow-step-label">Flow Building</div><div class="flow-step-tool" style="color:var(--muted);font-family:sans-serif;">Each planned flow is built one at a time using the FlowGenerator AI chat. The generator outputs a full flow definition that gets saved to the DB. Draft state is persisted so you can come back tomorrow.</div></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-line"><div class="flow-step-dot" style="background:rgba(63,185,80,0.2);color:#3fb950;border:1px solid #3fb950;">5</div></div>
+    <div class="flow-step-body"><div class="flow-step-label">Complete</div><div class="flow-step-tool" style="color:var(--muted);font-family:sans-serif;">Agent is created in DB with <code>POST /agents</code>. User is redirected to <code>/agents/:id/setup</code> to review the system prompt and configure API keys.</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="agent-layout">6. Agent Layout — Header, Tabs & Status Bar</h2>
+<p>Route: <code>/agents/:agentId/*</code> — All per-agent pages share this shell.</p>
+
+<div class="screen">
+  <div class="screen-bar">
+    <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+    <span class="screen-url">localhost:5173/agents/abc123/dashboard</span>
+  </div>
+  <div style="padding:0;">
+    <!-- Header -->
+    <div class="ui-header">
+      <span style="font-size:1.1rem;color:var(--muted);cursor:pointer;">←</span>
+      <span style="font-weight:600;font-size:0.95rem;">GrowthBot</span>
+      <span style="background:var(--bg);padding:0.15rem 0.5rem;border-radius:4px;font-size:0.78rem;color:var(--muted);">claude-sonnet-4-6</span>
+      <span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#3fb950;background:var(--bg);padding:0.15rem 0.5rem;border-radius:4px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:#3fb950;box-shadow:0 0 4px #3fb950;display:inline-block;"></span>
+        Ext
+      </span>
+    </div>
+    <!-- Tab bar -->
+    <div class="ui-tabs">
+      <span class="ui-tab active">Dashboard</span>
+      <span class="ui-tab">Chat</span>
+      <span class="ui-tab">Goals</span>
+      <span class="ui-tab">Analytics</span>
+      <span class="ui-tab">Setup</span>
+      <span class="ui-tab">Flows</span>
+      <span class="ui-tab">Review Actions</span>
+      <span class="ui-tab">Review Scrapes</span>
+      <span class="ui-tab">Reviews (Legacy)</span>
+      <span class="ui-tab">API Tools</span>
+      <span class="ui-tab">Extension</span>
+      <span class="ui-tab">Schedule</span>
+      <span class="ui-tab">Database</span>
+      <span class="ui-tab">Logs</span>
+      <span class="ui-tab">Memory</span>
+      <span class="ui-tab">Trace</span>
+      <span class="ui-tab">Brain Map</span>
+    </div>
+    <!-- Running bar -->
+    <div class="running-bar">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="color:#3fb950;font-size:0.6rem;">●</span>
+        <span style="font-weight:600;color:#3fb950;text-transform:uppercase;letter-spacing:0.05em;font-size:0.78rem;">Agent running</span>
+        <span style="color:var(--text);opacity:0.8;">— Searching r/SaaS for comment opportunities</span>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <span style="font-size:0.78rem;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:0.2rem 0.6rem;cursor:pointer;">↗ Go to chat</span>
+        <span style="font-size:0.78rem;background:rgba(218,54,51,0.15);color:#da3633;border:1px solid #da3633;border-radius:4px;padding:0.2rem 0.6rem;cursor:pointer;">■ Stop</span>
+      </div>
+    </div>
+    <div style="padding:1rem 1.5rem;color:var(--muted);font-size:0.85rem;">[tab content renders here]</div>
+  </div>
+</div>
+
+<h3>Header elements</h3>
+<table>
+  <tr><th>Element</th><th>Detail</th></tr>
+  <tr><td>← back arrow</td><td>Navigates to home page</td></tr>
+  <tr><td>Agent name</td><td>Agent's display name from DB</td></tr>
+  <tr><td>Model badge</td><td>Shows <code>agent.model</code> — the model used for generation steps</td></tr>
+  <tr><td>Ext indicator</td><td>Green dot + "Ext" = extension connected · Red "Ext offline" = disconnected. Polls every 30 seconds via <code>GET /extension/status</code></td></tr>
+  <tr><td>Running bar</td><td>Appears only when an autonomous run is active. Shows current task text from <code>agent.currentTask</code> field, updated by <code>update_status</code> tool calls. Has "Stop" button and link to chat.</td></tr>
+</table>
+
+<h3>Tab Reference</h3>
+<table>
+  <tr><th>Tab</th><th>Route</th><th>Purpose</th></tr>
+  <tr><td>Dashboard</td><td>/dashboard</td><td>At-a-glance: status, cost, pending approvals, recent actions, latest run</td></tr>
+  <tr><td>Chat</td><td>/chat</td><td>Interactive conversation with the chat agent or autonomous agent</td></tr>
+  <tr><td>Goals</td><td>/goals</td><td>Mission → Objective → Task hierarchy with status tracking</td></tr>
+  <tr><td>Analytics</td><td>/analytics</td><td>Performance charts, token usage, flow success rates</td></tr>
+  <tr><td>Setup</td><td>/setup</td><td>System prompt, model, API keys, profile blob, tone guide</td></tr>
+  <tr><td>Flows</td><td>/flows</td><td>All flows + flow builder + run history</td></tr>
+  <tr><td>Review Actions</td><td>/review-actions</td><td>Approval queue for action flows with requiresApproval:true</td></tr>
+  <tr><td>Review Scrapes</td><td>/review-scrapes</td><td>View recent scrape flow results</td></tr>
+  <tr><td>Reviews (Legacy)</td><td>/reviews</td><td>Read-only historical view — old __human_review__ system (deprecated)</td></tr>
+  <tr><td>API Tools</td><td>/api-tools</td><td>Custom HTTP or JavaScript tools</td></tr>
+  <tr><td>Extension</td><td>/extension</td><td>WebSocket connection status + install instructions</td></tr>
+  <tr><td>Schedule</td><td>/schedule</td><td>Cron schedules — wake-up, flow triggers</td></tr>
+  <tr><td>Database</td><td>/database</td><td>Agent-created data tables with row browser</td></tr>
+  <tr><td>Logs</td><td>/logs</td><td>Raw server-side log stream for this agent</td></tr>
+  <tr><td>Memory</td><td>/memory</td><td>Browse and search the agent's persistent memory</td></tr>
+  <tr><td>Trace</td><td>/trace</td><td>Full message-by-message trace of any run</td></tr>
+  <tr><td>Brain Map</td><td>/map</td><td>Visual graph of agent's memory entities and connections</td></tr>
+</table>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "name": "@agentspawner/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "test": "node --import /usr/local/lib/node_modules_global/lib/node_modules/tsx/dist/esm/index.mjs --experimental-test-module-mocks --test 'src/__tests__/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@agentspawner/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/websocket": "^11.0.2",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.39.3",
+    "fastify": "^5.2.1",
+    "node-cron": "^3.0.3",
+    "pino": "^10.3.1",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.30.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}

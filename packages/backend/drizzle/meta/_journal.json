@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1772575683612,
+      "tag": "0000_lonely_turbo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772627838594,
+      "tag": "0001_kind_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772632285817,
+      "tag": "0002_third_molten_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1772633929644,
+      "tag": "0003_mushy_captain_flint",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1773104652526,
+      "tag": "0004_dashing_kang",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1773159726280,
+      "tag": "0005_goofy_mother_askani",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1742724000000,
+      "tag": "0006_complete_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1742983200000,
+      "tag": "0007_add_flow_run_pause_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1744070400000,
+      "tag": "0014_wait_ms_builtin",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1744761600000,
+      "tag": "0015_secret_rate_limits",
+      "breakpoints": true
+    }
+  ]
+}

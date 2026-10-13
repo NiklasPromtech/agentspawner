@@ -1,0 +1,416 @@
+{
+  "meta": {
+    "source": "DESIGN.md",
+    "generated": "2026-03-20",
+    "description": "All incomplete tasks from the AgentSpawner design document. Mark done=true + audited_by_human=true as each task is completed and reviewed."
+  },
+  "tasks": [
+    {
+      "id": "1.3",
+      "section": "Section 1 — The Action/Data Architecture",
+      "title": "Flow-level deduplication keys",
+      "description": "Every flow should declare a primary key — the thing that makes an execution unique (e.g. userId for send_dm, postId for comment_on_post). This key is declared on the flow definition itself and used by the flow runner for both hard and soft break enforcement.",
+      "details": {
+        "examples": {
+          "send_dm": "key: userId",
+          "comment_on_post": "key: postId",
+          "follow_user": "key: userId",
+          "reply_to_mention": "key: mentionId",
+          "like_post": "key: postId"
+        },
+        "usage": [
+          "Hard break — certain actions can only happen once per key, ever",
+          "Soft break — certain actions can repeat but with a minimum interval"
+        ],
+        "enforcement": "The flow runner checks deduplication before running step 1 — no action step is reached if dedup blocks it"
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added dedupKeyField, dedupBreakType, dedupIntervalHours, dedupBlockMessage columns to flows schema + migrations. Wired into flows route (GET/POST/PUT). Added to FlowRecord, FlowInput, Flow types."
+    },
+    {
+      "id": "1.4",
+      "section": "Section 1 — The Action/Data Architecture",
+      "title": "Action log table",
+      "description": "Create a dedicated action_log table (not the generic memory) that records every action flow execution, whether it proceeded or was blocked by the guard.",
+      "details": {
+        "schema": {
+          "id": "TEXT PRIMARY KEY",
+          "agent_id": "TEXT NOT NULL",
+          "flow_name": "TEXT NOT NULL — e.g. send_dm",
+          "flow_type": "TEXT NOT NULL — action | scrape",
+          "key_field": "TEXT NOT NULL — e.g. user_id",
+          "key_value": "TEXT NOT NULL — e.g. @niklas",
+          "input": "TEXT NOT NULL — full JSON input to the flow",
+          "result": "TEXT — flow result or guard message",
+          "success": "INTEGER NOT NULL — 1=completed, 0=guard triggered/failed",
+          "run_id": "TEXT — which autonomous run triggered this",
+          "created_at": "TEXT NOT NULL"
+        },
+        "benefits": [
+          "Cheap agent can query 'what have I done to @niklas?' and get full history",
+          "Guard can do a DB lookup instead of a vision check for cross-session deduplication",
+          "Analytics tab shows real action history"
+        ]
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Created action_log table in schema.ts + migration in db/index.ts. Created action-log.ts route (GET/POST/DELETE). Registered in index.ts. Added ActionLogEntry type to frontend types."
+    },
+    {
+      "id": "1.5",
+      "section": "Section 1 — The Action/Data Architecture",
+      "title": "Guard DB lookup as first step (DB-first, vision second)",
+      "description": "Update the guard pattern so action flows check action_log first before doing a vision check. DB lookup is fast, cheap, and cross-session. Vision is a fallback for the first time only.",
+      "details": {
+        "guard_order": [
+          "1. Query action_log for (flow_name, key_value) pair — fast, cheap, cross-session",
+          "2. If no DB record exists, fall back to vision check for safety",
+          "3. After a successful action, write to action_log"
+        ],
+        "rationale": "Current guards use vision checks (screenshot + AI analysis). Great for 'is the unfollow button visible?' but slow and expensive for 'did I DM this person in the last 7 days?'"
+      },
+      "priority": 3,
+      "depends_on": ["1.4"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added __query_action_log__ sentinel to flow-runner.ts. Inputs: key_value, flow_name (optional), blocked_only (optional). Returns: { found, count, entries }. Updated flow generator system prompt to document query_action_log as the mandatory DB-first guard step for all action flows (with vision check as optional fallback). Updated action flows guard section to use DB-first pattern."
+    },
+    {
+      "id": "1.6",
+      "section": "Section 1 — The Action/Data Architecture",
+      "title": "Hard break and soft break deduplication config on flows",
+      "description": "Add deduplication config to the flow definition schema and enforce it in the flow runner before any steps execute. Hard break = never repeat on this key. Soft break = repeat only after interval, with routing message.",
+      "details": {
+        "hard_break_example": {
+          "deduplication": {
+            "keyField": "post_id",
+            "breakType": "hard",
+            "message": "Already commented on this post — permanent. Use reply_to_comment instead."
+          }
+        },
+        "soft_break_example": {
+          "deduplication": {
+            "keyField": "user_id",
+            "breakType": "soft",
+            "intervalHours": 168,
+            "message": "Sent a DM to this user less than 7 days ago. Check get_dm_thread(user_id) to see if they replied — if so, use reply_to_dm instead."
+          }
+        },
+        "key_insight": "Soft break failMessage should route to the right action, not just abandon — turns a skip into an escalate"
+      },
+      "priority": 2,
+      "depends_on": ["1.3", "1.4"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Implemented in flow-runner.ts: dedup check runs before step loop. Hard break = any prior non-blocked execution. Soft break = checks within dedupIntervalHours window. Blocked attempts are logged to action_log with blocked=true. Successful action flows write back to action_log after completion."
+    },
+    {
+      "id": "2.1",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 1 — Research: expensive agent-led automated research",
+      "description": "When creating a new agent, an expensive model (Sonnet) runs automated research (~60 seconds): web searches the company, competitors, product, pricing, target audience, and similar roles. Synthesises a draft role understanding internally.",
+      "details": {
+        "inputs": "One-line agent description from user (e.g. 'get leads for audiencescan.io on X')",
+        "research_steps": [
+          "Web search: the company and product",
+          "Web search: competitors",
+          "Web search: similar roles (e.g. 'X/Twitter outreach specialist', 'growth hacker job description')",
+          "Internal synthesis — does not show user a wall of text"
+        ]
+      },
+      "priority": 8,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Updated CONVERSE_SYSTEM_PROMPT in setup.ts to include Phase 1 research instructions. When messages.length === 1 (first user message), the /setup/converse endpoint includes getWebSearchToolDef() in the tools array. Sonnet uses web_search to research the company/competitors/audience/similar roles before asking the first clarifying question. Frontend shows 'Researching your role... (~30-60s)' loading indicator on first message."
+    },
+    {
+      "id": "2.2",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 2 — Clarification: 3–5 targeted questions",
+      "description": "After research, the expensive agent asks 3–5 short, targeted questions one at a time (not a form) to fill gaps the research couldn't fill. Each answer refines the brief.",
+      "details": {
+        "example_questions": [
+          "What tone should this agent use — professional, casual, or somewhere in between?",
+          "Are there any accounts or types of users you want to explicitly avoid?"
+        ],
+        "rules": [
+          "One question at a time, not a form",
+          "Questions targeted at gaps research couldn't fill",
+          "Each answer refines the brief"
+        ]
+      },
+      "priority": 8,
+      "depends_on": ["2.1"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Part of the same CONVERSE_SYSTEM_PROMPT update. The prompt now has explicit PHASE 2 section instructing one focused question at a time for gaps research couldn't fill. Existing conversational UI in AgentOnboarding.tsx handles the back-and-forth."
+    },
+    {
+      "id": "2.3",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 3 — Brief review: show proposed system prompt",
+      "description": "Show the proposed system prompt to the user. User can: Apply it, Amend it (chat-based), or Edit raw. Brief is locked before flows are created.",
+      "details": {
+        "actions": ["Apply — lock the brief and proceed", "Amend — chat-based editing", "Edit raw — direct text edit"],
+        "rule": "Brief must be locked before flows are created — can't build tools for an agent you haven't defined"
+      },
+      "priority": 8,
+      "depends_on": ["2.2"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Config panel slides in on right when converse returns done:true. Now has: editable name field, system prompt with 'Edit raw' toggle, goals list, and 'Apply & Plan Flows →' button. Agent is NOT created until Apply is clicked, enforcing the brief-first gate."
+    },
+    {
+      "id": "2.4",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 4 — Flow planning: expensive agent proposes flow set",
+      "description": "Based on the locked brief, the expensive agent proposes a set of flows the agent will need. For each flow: name, type (scrape/action), purpose, what data it needs. User approves the list — can add, remove, or modify. This becomes the build list.",
+      "priority": 9,
+      "depends_on": ["2.3"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added PLAN_FLOWS_SYSTEM_PROMPT and POST /setup/plan-flows endpoint to setup.ts. Endpoint takes systemPrompt + description + auth, calls Sonnet, returns {flows:[{name,type,description,purpose}]}. Added api.planFlows() to client.ts. AgentOnboarding transitions to flow_planning phase after Apply, calls planFlows, renders proposed flows as editable cards with remove button and +Add flow form."
+    },
+    {
+      "id": "2.5",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 5 — Flow building: one at a time with inline test inputs",
+      "description": "Each approved flow is built using the existing flow generator. For action flows: generator is explicitly instructed to build the guard + action + DB write pattern. Test inputs collected via inline input fields. Each built flow reviewed before moving to the next.",
+      "priority": 9,
+      "depends_on": ["2.4", "3.1"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Phase 5 renders FlowGenerator component embedded in AgentOnboarding. initialMessages seeded with flow name + description. Action flows get guard pattern instructions prepended. autoSend=true kicks off generation immediately. onFlow callback saves via api.createFlow and advances to next flow. Progress shown as colored pills in header. Skip button available."
+    },
+    {
+      "id": "2.6",
+      "section": "Section 2 — The Setup Experience",
+      "title": "Phase 6 — Unlock: Wake Up gated on expensive agent sign-off",
+      "description": "Only after all planned flows are built and approved does the Wake Up button become active. The cheap agent cannot run until the expensive agent has signed off on the complete setup.",
+      "priority": 9,
+      "depends_on": ["2.5"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Phase 6 (complete) renders after all flows are processed. Shows built/skipped flow summary. 'Open Agent →' navigates to agent chat. 'Wake Up ▶' button calls api.wakeUp and then navigates. Wake Up is only shown on this completion screen, ensuring the setup wizard is completed first."
+    },
+    {
+      "id": "3.1",
+      "section": "Section 3 — Flow Building UX",
+      "title": "Inline test input fields (Lovable-style) in flow generator",
+      "description": "When the flow generator needs test data, instead of asking the user to type values in chat, it emits a structured input_request object. The frontend renders this as actual input fields in the chat. User fills them in and submits — those values become the test input for the flow.",
+      "details": {
+        "input_request_format": {
+          "type": "input_request",
+          "fields": [
+            { "key": "user_id", "label": "Twitter handle to DM", "placeholder": "@username" },
+            { "key": "message", "label": "Message to send", "placeholder": "Hey, saw your thread on..." }
+          ]
+        },
+        "benefits": [
+          "Makes clear what data the flow needs",
+          "Forces user to have real test data — catches mismatched assumptions early",
+          "Much cleaner than 'type the values like: user_id=@niklas, message=Hello'"
+        ]
+      },
+      "priority": 6,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added request_test_inputs tool to GENERATOR_TOOLS in flows-generate.ts. When called, emits input_request SSE event and ends the stream. Updated system prompt to instruct generator to call this before test_flow. Frontend: added input_request to StreamEvent + ChatItem types. ChatItemView renders labeled input fields with required validation and submit button. On submit, values formatted as user message and sent as next conversation turn. Chat textarea disabled while form is pending."
+    },
+    {
+      "id": "3.2",
+      "section": "Section 3 — Flow Building UX",
+      "title": "Post-build guard validation (run flow twice)",
+      "description": "After test_flow runs on an action flow, the generator should verify the guard works correctly by running the flow twice with different setup states.",
+      "details": {
+        "validation_steps": [
+          "1. Run with 'already done' state — confirm guard exits early",
+          "2. Run in clean state — confirm action proceeded",
+          "3. DB write check — verify action_log was written after flow runs"
+        ]
+      },
+      "priority": 12,
+      "depends_on": ["1.4"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Modified testFlowInGenerator in flows-generate.ts. After a successful test_flow on an action flow: (1) finds the query_action_log guard step, (2) extracts key_field + key_value from its inputMapping, (3) seeds an action_log entry, (4) re-runs the flow, (5) checks guardFoundEntry (query_action_log returned found:true) and repeatBlocked (fewer steps ran than total, indicating early exit), (6) cleans up the seed, (7) emits thinking events with status, (8) returns guardValidation block in the JSON result. Updated test_flow tool description and system prompt with instructions for reading guardValidation. Generator is instructed to fix the flow if hasGuard=false, check key mapping if guardFoundEntry=false, check skipToStepId if repeatBlocked=false."
+    },
+    {
+      "id": "3.3",
+      "section": "Section 3 — Flow Building UX",
+      "title": "Deduplication config UI in flow editor",
+      "description": "In the flow editor UI, action flows should have a 'Deduplication' section where the user can see and edit: key field, break type (hard/soft), interval (if soft), and the block message.",
+      "priority": 6,
+      "depends_on": ["1.6"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added flowType toggle (scrape/action/unset) to Metadata section. Added Deduplication card (only visible for action flows) with: key field input, break type selector (hard/soft/none) with color coding, interval hours input (soft only), block message textarea with routing tip."
+    },
+    {
+      "id": "4.2",
+      "section": "Section 4 — The Cheap Agent's World",
+      "title": "Enforce cheap agent restrictions: no flow creation, no brief modification",
+      "description": "The cheap agent must be prevented from creating flows or modifying its own system prompt. Enforce via system prompt instructions AND route-level restrictions on the backend.",
+      "details": {
+        "cannot_do": [
+          "Create flows",
+          "Modify its own system prompt",
+          "Call APIs directly (only through approved flows)",
+          "Make decisions about what new flows to build (can request, not decide)"
+        ],
+        "can_do": [
+          "Call any approved flow",
+          "Read the action_log",
+          "Read memory",
+          "Write to memory",
+          "Send a message to the manager requesting a new capability"
+        ]
+      },
+      "priority": 7,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added CHEAP_AGENT_BLOCKED_TOOLS set (create_flow, update_flow, delete_flow). These are filtered out of the anthropicTools array before being sent to the model. Added runtime safety check in the tool handler that returns an explanatory error if these are somehow called anyway. Updated AUTONOMOUS_META_PROMPT to explicitly state the restriction. The cheap agent must use request_flow / revise_flow for all flow management."
+    },
+    {
+      "id": "4.3",
+      "section": "Section 4 — The Cheap Agent's World",
+      "title": "Formal manager escalation endpoint",
+      "description": "Create a formal path for the cheap agent to request new capabilities from the expensive manager agent. The cheap agent sends a structured capability request; the manager reviews existing flows first before building anything new.",
+      "details": {
+        "escalation_example": "I tried to reply to a DM thread but don't have a flow for reading existing DM threads. I need get_dm_thread(user_id) — a scrape flow that returns the last 5 messages in a conversation.",
+        "manager_process": [
+          "1. Check existing flows first — does any approved flow already cover this?",
+          "2. Consider reuse before building — can working selectors from another flow be reused?",
+          "3. Build only if genuinely new — run flow generator with proper test data",
+          "4. Audit the generated flow — has guard? correct type? naming convention?",
+          "5. Approve and add to cheap agent toolkit"
+        ],
+        "key_principle": "Before building anything new, check if working selectors already exist in an approved flow"
+      },
+      "priority": 7,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added request_capability MANAGEMENT_TOOL. When called: (1) manager model (Sonnet) reviews existing flows and decides REUSE vs BUILD; (2) if REUSE, returns which existing flow to use; (3) if BUILD, opens flow generator via open_flow_generator SSE event. Added full handler in handleManagementTool. The manager prompt includes all existing flows and enforces checking before building."
+    },
+    {
+      "id": "4.4",
+      "section": "Section 4 — The Cheap Agent's World",
+      "title": "Session briefing injection before each autonomous run",
+      "description": "Before the cheap agent's first action each session, inject a summary from action_log and contacts table so it starts fully informed about what it has done and what is pending.",
+      "details": {
+        "briefing_includes": [
+          "Current goals list",
+          "Last N entries from action_log (what it did recently)",
+          "Any pending manager messages"
+        ],
+        "example_briefing": "I DMed 9 people yesterday, 3 are pending response, I'm supposed to comment on 5 posts today — all readable from the DB before the first action"
+      },
+      "priority": 5,
+      "depends_on": ["1.4", "6.3"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Injected action_log (last 30 entries, split executed vs blocked) and contacts summary (by status, top prospects, replied contacts) into the wake-up contextBlock in autonomous.ts. Agent now starts every session knowing exactly what it has already done and who needs follow-up."
+    },
+    {
+      "id": "5.2",
+      "section": "Section 5 — Audit and Quality",
+      "title": "Periodic expensive-agent audit run",
+      "description": "On a schedule (or when triggered), the expensive manager reviews the action log and flow performance, flags issues, and writes a brief report to memory.",
+      "details": {
+        "audit_reviews": [
+          "Action log for the last 24 hours",
+          "Guard blocks — patterns suggesting cheap agent is trying wrong things",
+          "Escalation requests from the cheap agent",
+          "Flow run success rates — are any flows failing consistently?"
+        ],
+        "output": "Brief report written to memory, e.g. 'Flow comment_on_post failed 3 times today due to selector changes — needs rebuilding'"
+      },
+      "priority": 10,
+      "depends_on": ["1.4"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added POST /agents/:agentId/audit endpoint in analytics.ts. Gathers last 24h action_log + last 7d flow_runs + current flows/goals + last audit from memory. Builds text briefing, calls claude-sonnet-4-6 with AUDIT_SYSTEM_PROMPT (200-350 word report: action log, flow performance, guard effectiveness, recommendations). Saves report to memory as category='audit_report'. Added '✦ Run Audit' button in AnalyticsTab.tsx header; shows report in dismissible panel below. api.runAudit() added to client.ts."
+    },
+    {
+      "id": "5.3",
+      "section": "Section 5 — Audit and Quality",
+      "title": "Human approval queue for high-risk actions",
+      "description": "Certain action types require a human approval step before execution. The cheap agent queues the action as pending approval; the UI shows it in the Actions tab; the human approves or rejects.",
+      "details": {
+        "always_pending_approval": ["unfollow", "delete post"],
+        "auto_approved_after_proven": ["like", "comment"],
+        "implementation": "pending_actions table already exists — wire it into the action flow pattern"
+      },
+      "priority": 11,
+      "depends_on": ["1.4"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added requiresApproval boolean column to flows schema + migration (ALTER TABLE flows ADD COLUMN requires_approval INTEGER NOT NULL DEFAULT 0). Added to FlowRecord interface in flow-runner.ts. In runFlowDetailed: when requiresApproval=true and flowType='action', inserts a pending_actions row with the flow input as payload and returns without executing (returns actionId in the message so agent can reference it). Added requiresApproval to flows route Zod schema, POST insert, PUT update. Added to Flow + FlowInput frontend types. Added 'Require human approval' checkbox in FlowEditor.tsx inside the action flows Deduplication section with explanatory text."
+    },
+    {
+      "id": "6.3",
+      "section": "Section 6 — The Database Strategy",
+      "title": "Contacts table with standard schema",
+      "description": "Create a canonical contacts table that every outreach flow reads from and writes to consistently. This becomes the reliable source of truth for who has been contacted and their current status.",
+      "details": {
+        "schema": {
+          "id": "TEXT PRIMARY KEY",
+          "agent_id": "TEXT NOT NULL",
+          "platform": "TEXT NOT NULL — twitter, linkedin, etc.",
+          "handle": "TEXT NOT NULL",
+          "display_name": "TEXT",
+          "notes": "TEXT — research notes about this person",
+          "status": "TEXT — prospect, contacted, replied, converted",
+          "last_action": "TEXT — flow name of last action",
+          "last_action_at": "TEXT",
+          "last_action_input": "TEXT — JSON, full input to last action",
+          "created_at": "TEXT NOT NULL",
+          "updated_at": "TEXT NOT NULL"
+        },
+        "usage": "Every action flow that involves a user writes back to this table. Scrape flows populate it. Cheap agent reads it before deciding who to contact next."
+      },
+      "priority": 4,
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Created contacts table in schema.ts + migration in db/index.ts. Created contacts.ts route with GET/POST (upsert by platform+handle)/PATCH/DELETE. Registered in index.ts. Added Contact type to frontend types."
+    },
+    {
+      "id": "6.4",
+      "section": "Section 6 — The Database Strategy",
+      "title": "Flow metadata: declare which tables a flow reads/writes",
+      "description": "When a flow is built, the generator should declare what table it reads from (if any), what table it writes to (if any), and what fields it updates. This metadata enables auto-generating the DB schema from flow definitions and enforcing that action flows write back.",
+      "details": {
+        "metadata_fields": ["reads_from: table name or null", "writes_to: table name or null", "updates_fields: array of field names"],
+        "benefit": "System can auto-generate the database schema from flow definitions and enforce that action flows write back"
+      },
+      "priority": 4,
+      "depends_on": ["6.3"],
+      "done": true,
+      "audited_by_human": false,
+      "completed_at": "2026-03-20",
+      "implementation_notes": "Added readsFrom, writesTo, updatesFields columns to flows schema + migration. Wired into flows route (Zod schema, INSERT, UPDATE). Added to Flow + FlowInput types. Added 'Table Metadata' section card in FlowEditor.tsx with reads from / writes to inputs + comma-separated updates fields."
+    }
+  ]
+}

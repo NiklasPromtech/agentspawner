@@ -1,0 +1,13 @@
+{
+  "name": "agentspawner",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter=backend --filter=frontend dev",
+    "dev:backend": "pnpm --filter=backend dev",
+    "dev:frontend": "pnpm --filter=frontend dev",
+    "build": "pnpm --filter=backend build && pnpm --filter=frontend build && pnpm --filter=extension build",
+    "db:generate": "pnpm --filter=backend db:generate",
+    "db:migrate": "pnpm --filter=backend db:migrate"
+  }
+}

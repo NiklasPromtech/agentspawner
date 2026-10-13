@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "AgentSpawner",
+  "version": "0.1.0",
+  "description": "Browser automation for AgentSpawner AI agents",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "offscreen",
+    "storage"
+  ],
+  "host_permissions": [
+    "ws://localhost:3001/*",
+    "http://localhost:3001/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/index.js",
+    "type": "module"
+  },
+  "sandbox": {
+    "pages": ["sandbox/sandbox.html"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/index.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "AgentSpawner",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["flows-debugger/index.html", "flows-debugger/index.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

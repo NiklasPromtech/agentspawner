@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+packages/backend/data/
+packages/frontend/dist/
+packages/extension/dist/
+.DS_Store
+
+# Personal data: raw page dumps from a logged-in LinkedIn session
+play_ground/source.html
+play_ground/sample1.html
+play_ground/output.html
+
+# Local-only files
+INTERVIEW_PREP.md
+.claude/settings.local.json
+*.db.*

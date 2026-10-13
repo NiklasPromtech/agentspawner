@@ -1,0 +1,16 @@
+export const PRIMITIVE_CATEGORIES: Record<string, string> = {
+  open_tab:         'Navigation',
+  close_tab:        'Navigation',
+  navigate:         'Navigation',
+  wait_for:         'Waiting',
+  wait_for_any:     'Waiting',
+  click:            'Interaction',
+  type_text:        'Interaction',
+  scroll:           'Interaction',
+  get_dom:               'Reading',
+  get_dom_filtered:      'Reading',
+  get_dom_filtered_all:          'Reading',
+  get_dom_filtered_all_contains: 'Reading',
+  screenshot:            'Capture',
+  execute_code:     'Code',
+};

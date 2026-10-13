@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HTML Playground</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-shrink: 0;
+      background: #161b22;
+    }
+
+    header h1 { font-size: 0.9rem; font-weight: 600; color: #f0f6fc; }
+
+    .drop-zone {
+      border: 1.5px dashed #30363d;
+      border-radius: 6px;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.78rem;
+      color: #8b949e;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: #58a6ff;
+      color: #58a6ff;
+    }
+    .drop-zone input { display: none; }
+
+    /* ── Stats bar ── */
+    #stats {
+      display: none;
+      gap: 1.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    #stats.visible { display: flex; }
+
+    .stat { font-size: 0.78rem; color: #8b949e; }
+    .stat span { color: #f0f6fc; font-weight: 600; }
+    .stat.reduction span { color: #3fb950; }
+
+    /* ── Steps panel ── */
+    #steps-bar {
+      padding: 0.5rem 1.25rem;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      background: #0d1117;
+    }
+
+    .step-toggle {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      border: 1px solid #30363d;
+      background: none;
+      color: #8b949e;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .step-toggle:hover { border-color: #58a6ff; color: #58a6ff; }
+    .step-toggle.active { background: #1f6feb33; border-color: #58a6ff; color: #58a6ff; }
+
+    /* Preset buttons */
+    .preset-btn {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 20px;
+      border: 1px solid #3fb95055;
+      background: none;
+      color: #3fb950;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { background: #3fb95022; }
+
+    /* Pretty button */
+    #pretty-btn {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      border: 1px solid #30363d;
+      background: none;
+      color: #8b949e;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    #pretty-btn:hover { border-color: #e3b341; color: #e3b341; }
+    #pretty-btn.active { background: #e3b34122; border-color: #e3b341; color: #e3b341; }
+
+    #run-btn {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 20px;
+      border: none;
+      background: #238636;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    #run-btn:hover { background: #2ea043; }
+    #run-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Main split ── */
+    main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid #30363d;
+    }
+    .pane:last-child { border-right: none; }
+
+    .pane-header {
+      padding: 0.4rem 1rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #30363d;
+      background: #161b22;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .pane-header .size-badge {
+      font-size: 0.7rem;
+      color: #3fb950;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    /* ── View toggle tabs ── */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      margin-left: auto;
+    }
+    .view-tab {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.6rem;
+      border: 1px solid #30363d;
+      background: none;
+      color: #8b949e;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .view-tab:first-child { border-radius: 4px 0 0 4px; }
+    .view-tab:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
+    .view-tab.active      { background: #1f6feb33; border-color: #58a6ff; color: #58a6ff; }
+    .view-tab:hover:not(.active) { color: #c9d1d9; }
+
+    textarea {
+      flex: 1;
+      background: #0d1117;
+      color: #c9d1d9;
+      border: none;
+      outline: none;
+      padding: 0.75rem 1rem;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      resize: none;
+      overflow-y: auto;
+    }
+
+    iframe#render-frame {
+      flex: 1;
+      border: none;
+      background: #fff;
+      display: none;
+    }
+
+    /* ── Empty state ── */
+    #empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      pointer-events: none;
+    }
+    #empty p { font-size: 0.85rem; color: #8b949e; }
+    #empty .hint { font-size: 0.75rem; color: #484f58; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>HTML Playground</h1>
+
+    <label class="drop-zone" id="drop-zone">
+      📂 Drop source.html here or click to load
+      <input type="file" id="file-input" accept=".html,.htm" />
+    </label>
+
+    <div id="stats">
+      <div class="stat">Original <span id="stat-original">—</span></div>
+      <div class="stat">Cleaned  <span id="stat-cleaned">—</span></div>
+      <div class="stat reduction">Saved <span id="stat-saved">—</span></div>
+      <div class="stat">Chars <span id="stat-chars">—</span></div>
+    </div>
+  </header>
+
+  <!-- Presets row -->
+  <div style="padding: 0.4rem 1.25rem; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 0.5rem; background: #0d1117; flex-shrink: 0;">
+    <span style="font-size: 0.7rem; color: #484f58; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 0.25rem;">Presets</span>
+    <button class="preset-btn" id="preset-filtered">⚡ get_dom_filtered</button>
+    <button class="preset-btn" id="preset-all" style="color:#8b949e; border-color:#30363d;">All steps</button>
+    <button class="preset-btn" id="preset-none" style="color:#8b949e; border-color:#30363d;">Clear all</button>
+    <div style="width:1px; height:16px; background:#30363d; margin:0 0.25rem;"></div>
+    <button id="pretty-btn">⇥ Pretty HTML</button>
+  </div>
+
+  <!-- Cleaning step toggles -->
+  <div id="steps-bar">
+    <button class="step-toggle active" data-step="strip-class">strip class=""</button>
+    <button class="step-toggle" data-step="strip-script">strip &lt;script&gt;</button>
+    <button class="step-toggle" data-step="strip-style">strip &lt;style&gt;</button>
+    <button class="step-toggle" data-step="strip-svg">strip &lt;svg&gt;</button>
+    <button class="step-toggle" data-step="strip-comments">strip comments</button>
+    <button class="step-toggle" data-step="strip-img">strip &lt;img&gt;</button>
+    <button class="step-toggle" data-step="strip-display-contents">strip display:contents</button>
+    <button class="step-toggle" data-step="strip-style-attr">strip style=""</button>
+    <button class="step-toggle" data-step="strip-aria-hidden">strip aria-hidden</button>
+    <button class="step-toggle" data-step="normalize-custom-tags">normalize custom tags</button>
+    <button class="step-toggle" data-step="strip-attrs">strip all attrs except semantic</button>
+    <button class="step-toggle" data-step="strip-empty-tags">strip empty tags</button>
+    <button class="step-toggle" data-step="collapse-whitespace">collapse whitespace</button>
+    <button id="run-btn" disabled>▶ Run</button>
+  </div>
+
+  <main>
+    <!-- Source pane -->
+    <div class="pane">
+      <div class="pane-header">
+        Source
+        <span class="size-badge" id="source-size"></span>
+      </div>
+      <textarea id="source-ta" placeholder="Drop a file above, or paste HTML directly here…" spellcheck="false"></textarea>
+    </div>
+
+    <!-- Output pane -->
+    <div class="pane" style="position:relative;">
+      <div class="pane-header">
+        Output
+        <span class="size-badge" id="output-size"></span>
+        <div class="view-tabs">
+          <button class="view-tab active" id="tab-code">Code</button>
+          <button class="view-tab" id="tab-pretty">Pretty</button>
+          <button class="view-tab" id="tab-render">Rendered</button>
+        </div>
+      </div>
+      <textarea id="output-ta" readonly placeholder="Cleaned HTML will appear here…"></textarea>
+      <iframe id="render-frame" sandbox="allow-same-origin"></iframe>
+      <div id="empty">
+        <p>Drop a source.html to get started</p>
+        <p class="hint">Then toggle cleaning steps and hit ▶ Run</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────────
+
+    let sourceHtml  = '';
+    let cleanedHtml = '';
+
+    const KEEP_ATTRS = ['href','src','alt','id','aria-label','aria-hidden','type','name','value','placeholder','title'];
+
+    // ── View tabs ──────────────────────────────────────────────────────────────
+
+    const outputTa    = document.getElementById('output-ta');
+    const renderFrame = document.getElementById('render-frame');
+    const tabCode     = document.getElementById('tab-code');
+    const tabPretty   = document.getElementById('tab-pretty');
+    const tabRender   = document.getElementById('tab-render');
+
+    function setTab(active) {
+      [tabCode, tabPretty, tabRender].forEach(t => t.classList.remove('active'));
+      active.classList.add('active');
+      outputTa.style.display    = active !== tabRender ? 'block' : 'none';
+      renderFrame.style.display = active === tabRender ? 'block' : 'none';
+    }
+
+    tabCode.addEventListener('click', () => {
+      setTab(tabCode);
+      outputTa.value = cleanedHtml;
+    });
+
+    tabPretty.addEventListener('click', () => {
+      setTab(tabPretty);
+      outputTa.value = cleanedHtml ? prettyHtml(cleanedHtml) : '';
+    });
+
+    tabRender.addEventListener('click', () => {
+      setTab(tabRender);
+      if (cleanedHtml) updateFrame();
+    });
+
+    function updateFrame() {
+      renderFrame.srcdoc = cleanedHtml;
+    }
+
+    // ── Pretty formatter ───────────────────────────────────────────────────────
+
+    function prettyHtml(html) {
+      const INDENT = '  ';
+      const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+      // Normalise to one token per line first
+      let depth = 0;
+      let out   = '';
+      // Split into tokens: tags and text nodes
+      const tokens = html.split(/(<[^>]+>)/g);
+      for (let raw of tokens) {
+        const s = raw.trim();
+        if (!s) continue;
+        if (s.startsWith('</')) {
+          // Closing tag
+          depth = Math.max(0, depth - 1);
+          out += INDENT.repeat(depth) + s + '\n';
+        } else if (s.startsWith('<') && !s.startsWith('<!--')) {
+          // Opening or self-closing tag
+          out += INDENT.repeat(depth) + s + '\n';
+          const tag = (s.match(/^<([a-zA-Z][a-zA-Z0-9-]*)/) || [])[1]?.toLowerCase();
+          if (tag && !VOID.has(tag) && !s.endsWith('/>')) depth++;
+        } else {
+          // Text node
+          out += INDENT.repeat(depth) + s + '\n';
+        }
+      }
+      return out.trim();
+    }
+
+    // ── Presets ────────────────────────────────────────────────────────────────
+
+    // Steps that the get_dom_filtered preset enables — everything except strip-attrs
+    const FILTERED_PRESET = [
+      'strip-class','strip-script','strip-style','strip-svg','strip-comments',
+      'strip-img','strip-display-contents','strip-style-attr','strip-aria-hidden',
+      'normalize-custom-tags','strip-empty-tags','collapse-whitespace'
+    ];
+
+    function setSteps(steps) {
+      document.querySelectorAll('.step-toggle').forEach(btn => {
+        btn.classList.toggle('active', steps.includes(btn.dataset.step));
+        btn.style.opacity = '1';
+        btn.title = '';
+      });
+      if (sourceHtml) run();
+    }
+
+    document.getElementById('preset-filtered').addEventListener('click', () => {
+      setSteps(FILTERED_PRESET);
+    });
+
+    document.getElementById('preset-all').addEventListener('click', () => {
+      document.querySelectorAll('.step-toggle').forEach(btn => {
+        btn.classList.add('active');
+        btn.style.opacity = '1';
+        btn.title = '';
+      });
+      if (sourceHtml) run();
+    });
+
+    document.getElementById('preset-none').addEventListener('click', () => {
+      document.querySelectorAll('.step-toggle').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.opacity = '1';
+        btn.title = '';
+      });
+      if (sourceHtml) run();
+    });
+
+    // ── File loading ───────────────────────────────────────────────────────────
+
+    const fileInput = document.getElementById('file-input');
+    const dropZone  = document.getElementById('drop-zone');
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadFile(file);
+    });
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('over');
+      const file = e.dataTransfer.files[0];
+      if (file) loadFile(file);
+    });
+
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSource(e.target.result);
+      };
+      reader.readAsText(file);
+    }
+
+    function setSource(html) {
+      sourceHtml = html;
+      document.getElementById('source-ta').value = html;
+      document.getElementById('source-size').textContent = fmt(html.length);
+      document.getElementById('empty').style.display = 'none';
+      document.getElementById('run-btn').disabled = false;
+      run();
+    }
+
+    // Direct paste / type in the source textarea
+    document.getElementById('source-ta').addEventListener('input', (e) => {
+      const html = e.target.value;
+      sourceHtml = html;
+      document.getElementById('source-size').textContent = html.length ? fmt(html.length) : '';
+      document.getElementById('empty').style.display = html.length ? 'none' : '';
+      document.getElementById('run-btn').disabled = !html.length;
+      if (html.length) run();
+    });
+
+    // ── Step toggles ───────────────────────────────────────────────────────────
+
+    document.querySelectorAll('.step-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        if (sourceHtml) run();
+      });
+    });
+
+    document.getElementById('run-btn').addEventListener('click', run);
+
+    function isActive(step) {
+      return document.querySelector(`[data-step="${step}"]`)?.classList.contains('active');
+    }
+
+    // ── Cleaning pipeline ──────────────────────────────────────────────────────
+
+    function run() {
+      if (!sourceHtml) return;
+
+      let html = sourceHtml;
+
+      if (isActive('strip-class')) {
+        html = html.replace(/\s+class="[^"]*"/gi, '');
+        html = html.replace(/\s+class='[^']*'/gi, '');
+      }
+
+      if (isActive('strip-script')) {
+        html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+      }
+
+      if (isActive('strip-style')) {
+        html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
+      }
+
+      if (isActive('strip-svg')) {
+        html = html.replace(/<svg[\s\S]*?<\/svg>/gi, '');
+      }
+
+      if (isActive('strip-comments')) {
+        html = html.replace(/<!--[\s\S]*?-->/g, '');
+      }
+
+      if (isActive('strip-img')) {
+        html = html.replace(/<img\b[^>]*>/gi, '');
+      }
+
+      if (isActive('strip-display-contents')) {
+        // Replace the opening tag of any element with style="display: contents;" with a bare marker,
+        // keeping the children intact — the element itself vanishes but its content stays.
+        html = html.replace(/<([a-zA-Z][a-zA-Z0-9-]*)\s[^>]*style="[^"]*display\s*:\s*contents[^"]*"[^>]*>/gi, '');
+      }
+
+      if (isActive('strip-style-attr')) {
+        // Strip all inline style="" attributes from tags (run after strip-display-contents
+        // so the display:contents selector still has something to match).
+        html = html.replace(/\s+style="[^"]*"/gi, '');
+        html = html.replace(/\s+style='[^']*'/gi, '');
+      }
+
+      if (isActive('strip-aria-hidden')) {
+        html = html.replace(/<[^>]+aria-hidden="true"[^>]*/g, '<span style="display:none"');
+      }
+
+      if (isActive('normalize-custom-tags')) {
+        // Custom elements always contain a hyphen (HTML spec requirement).
+        // Replace opening tags with <div> and closing tags with </div> — content stays intact.
+        html = html.replace(/<([a-zA-Z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)+)(\s[^>]*)?>/gi, '<div>');
+        html = html.replace(/<\/([a-zA-Z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)+)>/gi, '</div>');
+        // Also strip <template> wrappers (used for declarative shadow roots) but keep their content
+        html = html.replace(/<template[^>]*>/gi, '');
+        html = html.replace(/<\/template>/gi, '');
+      }
+
+      if (isActive('strip-attrs')) {
+        html = html.replace(/<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)?>/g, (_m, tag, attrs) => {
+          attrs = attrs || '';
+          let kept = '';
+          for (const attr of KEEP_ATTRS) {
+            const m = attrs.match(new RegExp(`\\s${attr}=["']([^"']*)["']`, 'i'));
+            if (m) kept += ` ${attr}="${m[1]}"`;
+          }
+          return `<${tag}${kept}>`;
+        });
+      }
+
+      if (isActive('strip-empty-tags')) {
+        // Loop because removing inner empties can expose outer empties
+        const emptyTag = /<([a-zA-Z][a-zA-Z0-9-]*)(\s[^>]*)?>(\s*)<\/\1>/g;
+        let prev;
+        do {
+          prev = html;
+          html = html.replace(emptyTag, '');
+        } while (html !== prev);
+      }
+
+      if (isActive('collapse-whitespace')) {
+        html = html.replace(/\s{2,}/g, ' ').trim();
+      }
+
+      // ── Update state & UI ─────────────────────────────────────────────────
+
+      cleanedHtml = html;
+
+      document.getElementById('output-size').textContent = fmt(html.length);
+
+      // Update whichever output view is active
+      if (tabRender.classList.contains('active')) {
+        updateFrame();
+      } else if (tabPretty.classList.contains('active')) {
+        outputTa.value = prettyHtml(html);
+      } else {
+        outputTa.value = html;
+      }
+
+      const saved = sourceHtml.length - html.length;
+      const pct   = ((saved / sourceHtml.length) * 100).toFixed(1);
+
+      document.getElementById('stats').classList.add('visible');
+      document.getElementById('stat-original').textContent = fmt(sourceHtml.length);
+      document.getElementById('stat-cleaned').textContent  = fmt(html.length);
+      document.getElementById('stat-saved').textContent    = `${fmt(saved)} (${pct}%)`;
+      document.getElementById('stat-chars').textContent    = html.length.toLocaleString();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    function fmt(n) {
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} MB`;
+      if (n >= 1_000)     return `${(n / 1_000).toFixed(1)} KB`;
+      return `${n} B`;
+    }
+  </script>
+</body>
+</html>

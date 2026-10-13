@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentSpawner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      user-select: none;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      padding: 12px 14px 0;
+    }
+    .title { font-size: 14px; font-weight: 700; color: #58a6ff; letter-spacing: 0.3px; }
+
+    /* ── Tab bar ─────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      padding: 10px 14px 0;
+      border-bottom: 1px solid #21262d;
+    }
+    .tab {
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      cursor: pointer;
+      transition: color 0.12s, border-color 0.12s;
+      letter-spacing: 0.2px;
+    }
+    .tab.active {
+      color: #58a6ff;
+      border-bottom-color: #1f6feb;
+    }
+    .tab:hover:not(.active) { color: #e6edf3; }
+
+    /* ── Panels ──────────────────────────────────────── */
+    .panel { display: none; padding: 14px; }
+    .panel.active { display: block; }
+
+    /* ── Shared ──────────────────────────────────────── */
+    .section-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+    .divider { border: none; border-top: 1px solid #21262d; margin: 0 0 14px; }
+    .hint {
+      font-size: 10px;
+      color: #6e7681;
+      margin-top: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .hint kbd {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-size: 9px;
+      color: #8b949e;
+    }
+
+    /* ── Picker panel ────────────────────────────────── */
+    .modes { display: flex; gap: 6px; margin-bottom: 14px; }
+    .mode-btn {
+      flex: 1;
+      padding: 10px 4px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #161b22;
+      color: #e6edf3;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      text-align: center;
+      line-height: 1;
+    }
+    .mode-btn:hover { background: #1f6feb; border-color: #388bfd; color: #fff; }
+    .mode-btn:hover .desc { color: rgba(255,255,255,0.65); }
+    .mode-btn .icon { display: block; font-size: 20px; margin-bottom: 5px; }
+    .mode-btn .name { display: block; margin-bottom: 3px; }
+    .mode-btn .desc { display: block; font-size: 9px; color: #6e7681; font-weight: 400; }
+    .result-section { display: none; }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+    .mode-badge {
+      font-size: 9px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      padding: 2px 7px;
+      border-radius: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .selector-display {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 11px;
+      color: #79c0ff;
+      word-break: break-all;
+      line-height: 1.5;
+      min-height: 34px;
+      max-height: 76px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+    }
+    .copy-btn {
+      width: 100%;
+      padding: 7px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #21262d;
+      color: #e6edf3;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .copy-btn:hover { background: #30363d; }
+    .copy-btn.copied { background: #1a4731; border-color: #2ea043; color: #3fb950; }
+
+    /* ── Runner panel ────────────────────────────────── */
+    .step-select {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      cursor: pointer;
+      margin-bottom: 10px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b949e'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      padding-right: 26px;
+    }
+    .step-select:focus { outline: none; border-color: #1f6feb; }
+
+    .field-group {
+      margin-bottom: 8px;
+    }
+    .field-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .field-label .opt-badge {
+      font-size: 8px;
+      color: #6e7681;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+    .field-input {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      transition: border-color 0.12s;
+      box-sizing: border-box;
+    }
+    .field-input:focus {
+      outline: none;
+      border-color: #1f6feb;
+    }
+    .field-input::placeholder { color: #484f58; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 0;
+      cursor: pointer;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      accent-color: #1f6feb;
+    }
+    .checkbox-row span {
+      font-size: 11px;
+      color: #c9d1d9;
+    }
+
+    .use-last-btn {
+      font-size: 9px;
+      padding: 2px 6px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #8b949e;
+      cursor: pointer;
+      margin-left: auto;
+      transition: background 0.1s, color 0.1s;
+    }
+    .use-last-btn:hover { background: #30363d; color: #e6edf3; }
+
+    .pick-contains-btn {
+      font-size: 9px;
+      padding: 2px 6px;
+      background: #0d2d4a;
+      border: 1px solid #1f6feb;
+      border-radius: 4px;
+      color: #58a6ff;
+      cursor: pointer;
+      margin-left: auto;
+      transition: background 0.1s, color 0.1s;
+    }
+    .pick-contains-btn:hover { background: #1f6feb; color: #fff; }
+
+    .dom-mode-row {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .dom-mode-row.visible { display: flex; }
+    .dom-mode-toggle {
+      display: flex;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .dom-mode-btn {
+      padding: 2px 8px;
+      border: none;
+      background: none;
+      color: #8b949e;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+    .dom-mode-btn.active { background: #1f6feb33; color: #58a6ff; font-weight: 600; }
+    .dom-mode-btn:hover:not(.active) { background: #30363d22; color: #e6edf3; }
+
+    .run-btn {
+      width: 100%;
+      padding: 8px;
+      background: #1f6feb;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .run-btn:hover { background: #388bfd; }
+    .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .run-btn.running { opacity: 0.7; cursor: not-allowed; }
+
+    .result-area {
+      margin-top: 10px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+    }
+    .result-area.hidden { display: none; }
+    .result-area.success { border-color: #2ea043; }
+    .result-area.error { border-color: #f85149; }
+
+    .result-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 9px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .result-area.success .result-top { background: #1a4731; color: #3fb950; }
+    .result-area.error .result-top { background: #3d1a1a; color: #f85149; }
+    .result-char-count {
+      font-size: 9px;
+      font-weight: 400;
+      opacity: 0.75;
+      margin-right: auto;
+      margin-left: 8px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    }
+
+    .result-copy-btn {
+      font-size: 9px;
+      padding: 1px 6px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 4px;
+      cursor: pointer;
+      color: inherit;
+      transition: background 0.1s;
+    }
+    .result-copy-btn:hover { background: rgba(0,0,0,0.4); }
+
+    .result-pre {
+      background: #0d1117;
+      padding: 8px 10px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 10px;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 140px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    .no-fields-hint {
+      font-size: 11px;
+      color: #6e7681;
+      font-style: italic;
+      padding: 4px 0 8px;
+    }
+
+    /* ── Flows panel ─────────────────────────────────── */
+    .flow-launcher-btn {
+      width: 100%;
+      padding: 12px;
+      background: #1f6feb;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.12s;
+    }
+    .flow-launcher-btn:hover { background: #388bfd; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">AgentSpawner</div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" id="tab-picker">◎ Picker</button>
+    <button class="tab" id="tab-runner">▶ Runner</button>
+    <button class="tab" id="tab-flows">⚡ Flows</button>
+  </div>
+
+  <!-- ── Picker panel ───────────────────────────────── -->
+  <div class="panel active" id="panel-picker">
+    <div class="dom-mode-row visible" id="picker-dom-mode-row" style="margin-bottom:12px;">
+      <span>DOM</span>
+      <div class="dom-mode-toggle">
+        <button class="dom-mode-btn active" id="picker-dom-filtered">filtered</button>
+        <button class="dom-mode-btn" id="picker-dom-raw">raw</button>
+        <button class="dom-mode-btn" id="picker-dom-stable">stable</button>
+      </div>
+      <span id="picker-dom-hint" style="color:#484f58; font-size:10px;">display:contents transparent</span>
+    </div>
+    <div class="section-label">Pick mode</div>
+    <div class="modes">
+      <button class="mode-btn" id="btn-item">
+        <span class="icon">◎</span>
+        <span class="name">Item</span>
+        <span class="desc">Single element</span>
+      </button>
+      <button class="mode-btn" id="btn-object">
+        <span class="icon">▣</span>
+        <span class="name">Object</span>
+        <span class="desc">Container</span>
+      </button>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="result-section" id="result-section">
+      <div class="result-header">
+        <div class="section-label" style="margin-bottom:0">Last result</div>
+        <div class="mode-badge" id="last-mode-badge">item</div>
+      </div>
+      <div class="selector-display" id="last-selector"></div>
+      <button class="copy-btn" id="copy-again">Copy again</button>
+    </div>
+
+    <div class="hint">
+      Click a mode · hover to highlight · click to capture<br>
+      <kbd>Esc</kbd> to cancel
+    </div>
+  </div>
+
+  <!-- ── Runner panel ───────────────────────────────── -->
+  <div class="panel" id="panel-runner">
+    <div class="section-label">Step type</div>
+    <select class="step-select" id="step-select">
+      <optgroup label="Interaction">
+        <option value="click">click</option>
+        <option value="click_all">click_all</option>
+        <option value="click_contains">click_contains</option>
+        <option value="click_all_contains">click_all_contains</option>
+        <option value="double_click">double_click</option>
+        <option value="right_click">right_click</option>
+        <option value="hover">hover</option>
+        <option value="focus">focus</option>
+        <option value="scroll">scroll</option>
+        <option value="scroll_load">scroll_load</option>
+      </optgroup>
+      <optgroup label="Input">
+        <option value="type_text">type_text</option>
+        <option value="press_key">press_key</option>
+        <option value="select_option">select_option</option>
+        <option value="set_checkbox">set_checkbox</option>
+      </optgroup>
+      <optgroup label="Wait">
+        <option value="wait_for">wait_for</option>
+        <option value="wait_for_any">wait_for_any</option>
+        <option value="wait_for_gone">wait_for_gone</option>
+        <option value="wait_ms">wait_ms</option>
+      </optgroup>
+      <optgroup label="Read">
+        <option value="get_text">get_text</option>
+        <option value="get_url">get_url</option>
+        <option value="get_title">get_title</option>
+        <option value="element_exists">element_exists</option>
+        <option value="count_elements">count_elements</option>
+        <option value="get_attribute">get_attribute</option>
+        <option value="get_dom">get_dom</option>
+        <option value="get_dom_filtered">get_dom_filtered</option>
+        <option value="get_dom_filtered_all">get_dom_filtered_all</option>
+        <option value="get_dom_filtered_all_contains">get_dom_filtered_all_contains</option>
+      </optgroup>
+      <optgroup label="Navigation">
+        <option value="go_back">go_back</option>
+        <option value="go_forward">go_forward</option>
+        <option value="reload_page">reload_page</option>
+      </optgroup>
+    </select>
+
+    <div id="step-inputs"></div>
+
+    <div class="dom-mode-row" id="dom-mode-row">
+      <span>Mode</span>
+      <div class="dom-mode-toggle">
+        <button class="dom-mode-btn active" id="dom-mode-filtered">filtered</button>
+        <button class="dom-mode-btn" id="dom-mode-raw">raw</button>
+      </div>
+      <span id="dom-mode-hint" style="color:#484f58; font-size:10px;">scripts/styles/SVG/attrs stripped</span>
+    </div>
+
+    <button class="run-btn" id="run-btn">▶ Run</button>
+
+    <div class="result-area hidden" id="result-area">
+      <div class="result-top">
+        <span id="result-status">✓ Success</span>
+        <span class="result-char-count" id="result-char-count"></span>
+        <button class="result-copy-btn" id="copy-step-btn" style="display:none">Copy step</button>
+        <button class="result-copy-btn" id="result-copy-btn">Copy</button>
+      </div>
+      <pre class="result-pre" id="result-pre"></pre>
+    </div>
+  </div>
+
+  <!-- ── Flows panel ────────────────────────────────── -->
+  <div class="panel" id="panel-flows">
+    <button class="flow-launcher-btn" id="open-flows-debugger-btn">⚡ Open Flows Debugger</button>
+  </div>
+
+  <script src="./index.js" type="module"></script>
+</body>
+</html>

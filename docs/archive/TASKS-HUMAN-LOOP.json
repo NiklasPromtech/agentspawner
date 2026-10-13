@@ -1,0 +1,407 @@
+{
+  "meta": {
+    "generated": "2026-03-21",
+    "description": "Design tasks for three major features: (1) platform feasibility detection during setup, (2) flow failure feedback loop back to setup, (3) inline tab-based human approval layer with tone learning."
+  },
+  "tasks": [
+
+
+    {
+      "id": "F1.1",
+      "section": "Feature 1 — Platform Feasibility Detection",
+      "title": "Platform constraint registry",
+      "description": "Create a static registry of known automation constraints per platform. Used by the flow planner to flag or exclude infeasible flows before build time.",
+      "details": {
+        "format": "A JSON/TS object keyed by platform domain pattern",
+        "fields_per_entry": {
+          "platform": "reddit.com",
+          "constraints": [
+            {
+              "area": "direct_messages",
+              "reason": "Reddit Chat UI (rs-app, rs-rooms-nav) is built with nested Web Components behind multiple Shadow DOM layers. Standard document.querySelector cannot pierce these boundaries. All DM content is unreachable via CSS selectors.",
+              "severity": "blocking",
+              "workaround": "None via DOM. Reddit's Sendbird API could theoretically be called directly but requires session token extraction."
+            },
+            {
+              "area": "anti_bot",
+              "reason": "Reddit detects rapid automated interactions. Posting too frequently triggers shadowbans.",
+              "severity": "rate_limit",
+              "workaround": "Space actions with wait_ms, randomise intervals, cap per-subreddit frequency."
+            }
+          ],
+          "safe_flows": ["check_notifications", "read_posts", "read_comments", "post_comment", "submit_post", "check_inbox_old_format"]
+        },
+        "initial_platforms": ["reddit.com", "twitter.com", "linkedin.com", "instagram.com", "youtube.com"],
+        "location": "packages/backend/src/data/platform-constraints.ts"
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F1.2",
+      "section": "Feature 1 — Platform Feasibility Detection",
+      "title": "Inject platform constraints into planFlows system prompt",
+      "description": "When planning flows during agent setup, detect the target platform from the agent's system prompt / user description, look up constraints, and inject them into the planner's context so it never proposes infeasible flows.",
+      "details": {
+        "where": "packages/backend/src/routes/setup.ts — planFlows handler",
+        "logic": [
+          "Extract platform signals from systemPrompt + description (regex + keyword match on domain names)",
+          "Look up matching constraints from the registry",
+          "Append a PLATFORM CONSTRAINTS block to the planner system prompt",
+          "Instruct the planner: do not propose flows that are marked blocking, do flag rate_limit constraints in the flow description"
+        ],
+        "prompt_block_example": "PLATFORM CONSTRAINTS for reddit.com:\n- Direct messages (DMs): BLOCKED — Reddit Chat uses nested Shadow DOM (Web Components), CSS selectors cannot reach it. Do NOT propose any DM or chat flows.\n- Rate limiting: space comment/post actions, never batch more than 3 per hour per subreddit.",
+        "output": "Planner only surfaces feasible flows. Blocking constraints are silently excluded. Rate-limit constraints appear as notes in flow descriptions."
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F1.3",
+      "section": "Feature 1 — Platform Feasibility Detection",
+      "title": "Show platform constraint summary in flow planning UI",
+      "description": "In the flow planning phase of the setup wizard, display a small 'platform notes' block above the proposed flows list that tells the user what was automatically excluded and why.",
+      "details": {
+        "where": "AgentOnboarding.tsx — flow_planning phase render",
+        "ui": "A collapsible amber/yellow notice block above the flow list. Title: 'Platform notes for [platform]'. Lists blocking constraints with plain-language explanations. Example: '⚠ Reddit DMs are not automatable (Shadow DOM) — DM flows were excluded from this plan.'",
+        "behaviour": "If no constraints apply, block is not shown. If constraints exist, block is shown collapsed by default, expandable."
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F1.4",
+      "section": "Feature 1 — Platform Feasibility Detection",
+      "title": "Feasibility note on individual flows in the generator",
+      "description": "When the flow generator is building a flow and encounters a constraint mid-build (e.g. a selector fails consistently for Shadow DOM reasons), it should recognise the pattern, explain the platform-level cause, and offer to mark the flow as infeasible rather than keep trying technical workarounds.",
+      "details": {
+        "where": "packages/backend/src/routes/flows-generate.ts — system prompt",
+        "addition": "Add a PLATFORM FEASIBILITY section to the generator system prompt: 'If you encounter repeated selector failures on a known Shadow DOM site, stop attempting technical solutions. Explain the Shadow DOM constraint clearly, tell the user this flow is not automatable via the browser extension, and offer to mark it as infeasible so the agent setup can adjust its scope.'",
+        "ui_hook": "FlowGenerator should support an onInfeasible callback alongside onFlow. When called, AgentOnboarding treats it the same as skip but records the reason."
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+
+    {
+      "id": "F2.1",
+      "section": "Feature 2 — Flow Failure Feedback Loop",
+      "title": "Mark flow as infeasible",
+      "description": "Add an 'infeasible' status to flows with a required reason field. Infeasible flows are kept for audit purposes but excluded from the agent's tool list.",
+      "details": {
+        "schema_change": "ADD COLUMN infeasible INTEGER NOT NULL DEFAULT 0, ADD COLUMN infeasible_reason TEXT",
+        "migration": "packages/backend/src/db/index.ts",
+        "ui": "FlowEditor + FlowsTab get a 'Mark as infeasible' button. Clicking it opens a modal asking for a brief reason (e.g. 'Shadow DOM — Reddit DMs unreachable'). Infeasible flows show with a strikethrough and amber badge in the flow list.",
+        "flow_runner": "Skip infeasible flows silently when the agent tries to call them — return a clear explanation message rather than an error."
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F2.2",
+      "section": "Feature 2 — Flow Failure Feedback Loop",
+      "title": "Infeasibility retrospective prompt",
+      "description": "When a flow is marked infeasible, surface a modal/inline prompt offering to open a retrospective setup chat: 'This capability turned out to be unavailable. Would you like to revisit the agent's scope and adjust what it focuses on instead?'",
+      "details": {
+        "trigger": "After marking a flow infeasible (F2.1)",
+        "options_offered": [
+          "Yes — open retrospective chat",
+          "No — just remove it quietly"
+        ],
+        "retrospective_context_passed": {
+          "failed_flow_name": "send_reddit_dm",
+          "failed_flow_reason": "Shadow DOM — Reddit Chat unreachable",
+          "agent_name": "Reddit Growth Agent",
+          "current_system_prompt": "<current agent system prompt>",
+          "current_goals": "<current goals array>"
+        }
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F2.3",
+      "section": "Feature 2 — Flow Failure Feedback Loop",
+      "title": "Retrospective setup chat",
+      "description": "A lightweight re-entry into the setup conversation, pre-seeded with the failure context. The user can say 'focus on public posts instead' and the LLM updates the system prompt, goals, and planned flows accordingly.",
+      "details": {
+        "where": "New route POST /agents/:id/retrospective + new UI panel (or re-use AgentOnboarding in 'edit' mode)",
+        "initial_message_injected": "We tried to build the '{{flow_name}}' flow but hit a hard limit: {{reason}}. Given this, should we adjust what {{agent_name}} focuses on? I can update the system prompt, remove the related goals, and suggest alternative flows.",
+        "on_completion": [
+          "Update agent system prompt via PUT /agents/:id",
+          "Update/remove affected goals",
+          "Add replacement planned flows back to the flow-building queue if the user agrees"
+        ],
+        "ui_entry_points": [
+          "From infeasibility retrospective prompt (F2.2)",
+          "From flow list — 'Revisit agent scope' button shown when any flows are infeasible",
+          "From agent settings page"
+        ]
+      },
+      "priority": 3,
+      "done": true,
+      "audited_by_human": false
+    },
+
+
+    {
+      "id": "F3.1",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "pending_human_reviews table",
+      "description": "New DB table that represents a paused flow step waiting for a human decision on a specific browser tab.",
+      "details": {
+        "schema": {
+          "id": "TEXT PRIMARY KEY",
+          "agentId": "TEXT NOT NULL",
+          "flowRunId": "TEXT — the paused flow run",
+          "flowName": "TEXT",
+          "stepId": "TEXT — which step in the flow is paused",
+          "tabUrl": "TEXT — the URL that was opened for review",
+          "draftContent": "TEXT — what the agent wrote (comment body, post text, DM text, etc.)",
+          "contentLabel": "TEXT — human-readable label e.g. 'Comment on r/web3'",
+          "status": "TEXT — pending | approved | approved_with_edits | rejected",
+          "finalContent": "TEXT — what the human actually approved (may differ from draft)",
+          "rejectionReason": "TEXT",
+          "createdAt": "INTEGER",
+          "resolvedAt": "INTEGER"
+        },
+        "location": "packages/backend/src/db/schema.ts + migration in index.ts"
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F3.2",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "Flow runner pause point — await_human_review step type",
+      "description": "New flow step execution model. When a step's tool is 'await_human_review', the flow runner opens the target tab, stores a pending_human_review record, and returns a 'paused' status rather than completing. The agent is notified the action is queued for review.",
+      "details": {
+        "flow_runner_changes": [
+          "Detect steps with a special reviewConfig block: { requiresHumanReview: true, contentField: 'text', labelTemplate: 'Comment on {{url}}' }",
+          "Before executing the action step, create a pending_human_review row",
+          "Open the target tab (the page where the action would happen)",
+          "Store the draft content (from the previous step's output or the step's input mapping)",
+          "Return { paused: true, reviewId, message: 'Waiting for human approval on [tab]' } instead of executing",
+          "The flow run is marked status=paused rather than completed"
+        ],
+        "resume_logic": "A separate resumeFlowRun(reviewId) function picks up the paused run, injects the human's final content into the step input, and continues execution from that step.",
+        "agent_behaviour": "The agent receives the paused message and simply moves on to other tasks. It does not block or retry."
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F3.3",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "Backend review resolution API",
+      "description": "REST endpoints for the extension to submit human decisions on pending reviews, and for the frontend to list/monitor pending reviews.",
+      "details": {
+        "endpoints": {
+          "GET /agents/:id/reviews": "List pending (and recent resolved) reviews for an agent",
+          "GET /reviews/:reviewId": "Get a single review including draft content",
+          "POST /reviews/:reviewId/resolve": {
+            "body": {
+              "decision": "approved | approved_with_edits | rejected",
+              "finalContent": "TEXT — the (possibly edited) content to use",
+              "rejectionReason": "TEXT — optional"
+            },
+            "effect": "Updates pending_human_reviews row, triggers resumeFlowRun"
+          }
+        }
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F3.4",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "Extension overlay injected on tabs pending review",
+      "description": "When the extension is active on a tab that has a pending review, inject a floating overlay UI showing the draft content and three action buttons. The human can read it, edit it, then resolve.",
+      "details": {
+        "detection": "Background script polls GET /reviews/by-tab?url=<current_tab_url> every few seconds. When a pending review is found for the current tab URL, injects the overlay.",
+        "overlay_ui": {
+          "position": "Fixed, bottom-right, non-intrusive until interacted with. Expands on click.",
+          "collapsed_state": "Small badge: '1 action waiting for your review ▲'",
+          "expanded_state": {
+            "header": "Agent wants to post — [contentLabel]",
+            "draft_display": "Editable textarea pre-filled with draftContent so human can read and modify",
+            "actions": [
+              {
+                "label": "✓ Send as written",
+                "effect": "POST /reviews/:id/resolve { decision: approved, finalContent: draftContent }"
+              },
+              {
+                "label": "✎ Send with my edits",
+                "effect": "POST /reviews/:id/resolve { decision: approved_with_edits, finalContent: <edited textarea value> }"
+              },
+              {
+                "label": "✗ Reject",
+                "effect": "Opens small reason input, then POST /reviews/:id/resolve { decision: rejected, rejectionReason }"
+              }
+            ]
+          }
+        },
+        "after_resolution": "Overlay disappears. Flow runner resumes automatically."
+      },
+      "priority": 1,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F3.5",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "Pending reviews panel in agent UI",
+      "description": "A lightweight 'Waiting for you' panel visible in the agent's frontend that shows all pending reviews across flows, so the user knows what tabs to check.",
+      "details": {
+        "where": "AgentLayout — add a badge/indicator in the nav when reviews are pending. A new ReviewsTab or inline panel on the agent dashboard.",
+        "contents_per_review": [
+          "Flow name + step label",
+          "Draft content preview (truncated)",
+          "Tab URL",
+          "Time waiting",
+          "Link: 'Open tab →' — opens the relevant tab in the browser",
+          "Quick actions: approve / reject inline without opening the tab (for power users)"
+        ],
+        "polling": "Frontend polls GET /agents/:id/reviews every 15s when the agent page is open. Badge count shown in nav."
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F3.6",
+      "section": "Feature 3 — Inline Tab Approval",
+      "title": "requiresHumanReview flag on action flows",
+      "description": "Add a requiresHumanReview boolean to flow definitions (alongside the existing requiresApproval). When set, the flow runner activates the inline tab-based review instead of the old pending_actions queue approach.",
+      "details": {
+        "schema": "ADD COLUMN requires_human_review INTEGER NOT NULL DEFAULT 0",
+        "ui": "FlowEditor — checkbox under the action flow section: '📋 Require human review before completing action (opens tab overlay)'",
+        "interaction_with_requiresApproval": "requiresHumanReview supersedes requiresApproval for action flows. requiresApproval remains for non-browser actions (API calls, etc.) where there is no tab to open."
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+
+    {
+      "id": "F4.1",
+      "section": "Feature 4 — Tone Learning",
+      "title": "tone_edits table",
+      "description": "Capture every edit made by the human in the inline approval overlay as a before/after pair. These pairs are the raw training signal for tone learning.",
+      "details": {
+        "schema": {
+          "id": "TEXT PRIMARY KEY",
+          "agentId": "TEXT NOT NULL",
+          "reviewId": "TEXT — FK to pending_human_reviews",
+          "flowName": "TEXT",
+          "context": "TEXT — where this text was used (subreddit, platform, content type)",
+          "agentDraft": "TEXT — what the agent originally wrote",
+          "humanFinal": "TEXT — what the human actually sent",
+          "createdAt": "INTEGER"
+        },
+        "when_populated": "POST /reviews/:id/resolve with decision=approved_with_edits — diff the draftContent vs finalContent and store both if meaningfully different (more than cosmetic whitespace changes)"
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F4.2",
+      "section": "Feature 4 — Tone Learning",
+      "title": "Tone analysis job — derive tone guide from edit history",
+      "description": "Periodically (or on-demand) run an LLM analysis over accumulated tone_edits for an agent to extract a concise tone guide: the patterns in what the human consistently changes.",
+      "details": {
+        "trigger": [
+          "After every 5th edit (rolling)",
+          "Manually from agent settings: 'Refresh tone guide'"
+        ],
+        "prompt_approach": "Feed the LLM N before/after pairs with the instruction: 'The agent wrote [A] and the human changed it to [B]. Across these examples, identify the consistent patterns: what does the human consistently change about tone, vocabulary, length, formality, honesty, personal voice? Output a concise tone guide (max 8 bullet points) that the agent should follow when writing.'",
+        "output_format": [
+          "Use first person and sound like a real person sharing experience, not a brand",
+          "Keep comments under 3 sentences unless the topic genuinely needs depth",
+          "Lead with curiosity or a genuine question rather than a statement",
+          "Never use phrases like 'great point' or 'absolutely'",
+          "Be willing to share a contrarian take if you have one"
+        ],
+        "storage": "agents table — ADD COLUMN tone_guide TEXT (JSON array of bullet strings), ADD COLUMN tone_guide_updated_at INTEGER"
+      },
+      "priority": 2,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F4.3",
+      "section": "Feature 4 — Tone Learning",
+      "title": "Inject tone guide into flow content generation",
+      "description": "When a flow step generates text content (comments, posts, replies), inject the agent's current tone guide into the system prompt so drafts reflect what the human has demonstrated they want.",
+      "details": {
+        "where": "flow-runner.ts — when building the context for steps that invoke content-generating tools",
+        "injection": "If agent.toneGuide is non-empty, prepend to the step's effective system prompt: 'TONE GUIDE (learned from your edits):\n{{toneGuide bullets}}\n\nApply this consistently when drafting any text.'",
+        "also_inject_into": "The FlowGenerator system prompt when generating flows that produce text content, so the flow itself is designed with tone in mind from the start."
+      },
+      "priority": 3,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F4.4",
+      "section": "Feature 4 — Tone Learning",
+      "title": "Tone guide UI in agent settings",
+      "description": "Show the agent's learned tone guide in the settings/profile page. The human can read what the agent has learned, edit individual bullets, add new ones, or delete ones that are wrong.",
+      "details": {
+        "where": "Agent settings page or a new 'Voice & Tone' tab in the agent layout",
+        "ui": [
+          "List of bullet points — each editable inline",
+          "Add new bullet manually",
+          "Delete individual bullets",
+          "Button: 'Re-analyse from edit history' — triggers F4.2 fresh",
+          "Edit count shown: 'Based on 12 edits'",
+          "If fewer than 3 edits: 'Not enough edits yet — tone guide will appear after you've reviewed and edited a few drafts'"
+        ]
+      },
+      "priority": 3,
+      "done": true,
+      "audited_by_human": false
+    },
+
+    {
+      "id": "F4.5",
+      "section": "Feature 4 — Tone Learning",
+      "title": "Tone diff highlight in approval overlay",
+      "description": "In the inline approval overlay, when the human edits the draft, show a subtle visual diff between the original draft and their edit so they can see exactly what changed. This makes the learning feel transparent.",
+      "details": {
+        "ui": "Below the textarea, a small collapsed 'Changes from draft' section. Uses a simple word-level diff (additions in green, removals in red strikethrough). Collapsed by default, expandable.",
+        "purpose": "Helps the human understand what the agent got wrong and builds awareness of the feedback loop. Over time they see the agent adapting.",
+        "implementation": "Client-side diff using a lightweight library (e.g. diff-match-patch, ~10kb). Runs in the extension overlay."
+      },
+      "priority": 3,
+      "done": true,
+      "audited_by_human": false
+    }
+
+  ]
+}
